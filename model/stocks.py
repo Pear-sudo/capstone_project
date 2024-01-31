@@ -30,13 +30,14 @@ class Stock(Database):
     def __init__(self, stk_id: str):
         super().__init__()
         self.stk_id: str = stk_id
+        self.columns = "stkcd, trddt, trdsta, opnprc, hiprc, loprc, clsprc, dnshrtrd"
 
         self._count: Optional[int] = None
         self.boundary_training_validating = None
         self.boundary_validating_testing = None
 
         self.query_template = Template(
-            f"select * from stock where stkcd = '000001' order by trddt offset $offset limit $limit")
+            f"select {self.columns} from stock where stkcd = '000001' order by trddt offset $offset limit $limit")
 
     @property
     def count(self) -> int:
