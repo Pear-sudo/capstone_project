@@ -1,7 +1,7 @@
 import csv
-from enum import Enum
-from typing import Optional
+from enum import Enum, auto
 from string import Template
+from typing import Optional
 
 from psycopg import Cursor
 from psycopg.rows import Row
@@ -14,6 +14,30 @@ class DataFragment(Enum):
     TESTING = "testing"
     VALIDATION = "validation"
     ALL = "all"
+
+
+class StockColumn(Enum):
+    stkcd = auto()
+    trddt = auto()
+    trdsta = auto()
+    opnprc = auto()
+    hiprc = auto()
+    loprc = auto()
+    clsprc = auto()
+    dnshrtrd = auto()
+    dnvaltrd = auto()
+    dsmvosd = auto()
+    dsmvtll = auto()
+    dretwd = auto()
+    dretnd = auto()
+    adjprcwd = auto()
+    adjprcnd = auto()
+    markettype = auto()
+    capchgdt = auto()
+    ahshrtrd_d = auto()
+    ahvaltrd_d = auto()
+    precloseprice = auto()
+    changeratio = auto()
 
 
 class Stocks(Database):
@@ -32,7 +56,7 @@ class Stocks(Database):
         cur = conn.cursor(name="csv_exporter")
         cur.itersize = 10_000
         try:
-            cur.execute(f"SELECT * FROM {self.table_name}")
+            cur.execute(f"SELECT * FROM {self.table_name} where stkcd = '000001'")
 
             # Open the CSV file for writing
             with open(filename, 'w', newline='') as csvfile:
@@ -55,6 +79,7 @@ class Stocks(Database):
         finally:
             cur.close()
             conn.close()
+        print('Export completed without any error.')
 
 
 class Stock(Database):
@@ -124,4 +149,4 @@ class Stock(Database):
 
 
 if __name__ == '__main__':
-    Stocks().export_to_csv()
+    Stocks().export_to_csv(filename='../data/sample.csv')
