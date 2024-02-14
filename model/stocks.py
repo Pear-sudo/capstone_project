@@ -1,3 +1,4 @@
+import csv
 from enum import Enum
 from typing import Optional
 from string import Template
@@ -18,12 +19,42 @@ class DataFragment(Enum):
 class Stocks(Database):
     def __init__(self):
         super().__init__()
+        self.table_name = "stock"
 
     def list_stocks(self) -> list[str]:
-        stocks = self.get_connection().execute('select stkcd from stock group by stkcd').fetchall()
+        stocks = self.get_connection().execute(f'select stkcd from {self.table_name} group by stkcd').fetchall()
         stocks = [row[0] for row in stocks]
         stocks.sort()
         return stocks
+
+    def export_to_csv(self, filename: str = "../data/stocks.csv") -> None:
+        conn = self.get_connection()
+        cur = conn.cursor(name="csv_exporter")
+        cur.itersize = 10_000
+        try:
+            cur.execute(f"SELECT * FROM {self.table_name}")
+
+            # Open the CSV file for writing
+            with open(filename, 'w', newline='') as csvfile:
+                csvwriter = csv.writer(csvfile)
+
+                # Write the column headers
+                col_names = [desc[0] for desc in cur.description]
+                csvwriter.writerow(col_names)
+
+                # Write the rows of data
+                while True:
+                    rows = cur.fetchmany(cur.itersize)
+                    if not rows:
+                        break
+                    csvwriter.writerows(rows)
+
+        except Exception as e:
+            print("Error: ", e)
+
+        finally:
+            cur.close()
+            conn.close()
 
 
 class Stock(Database):
@@ -90,3 +121,7 @@ class Stock(Database):
                         limit='all'
                     )
                 )
+
+
+if __name__ == '__main__':
+    Stocks().export_to_csv()
