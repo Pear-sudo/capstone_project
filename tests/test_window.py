@@ -1,6 +1,15 @@
-from model.loader import split_to_dataframes, load_dataset
+import pytest
+
+from model.loader import *
 from model.stocks import StockColumn
 from model.window import WindowGenerator
+
+
+@pytest.fixture(scope="module")
+def window():
+    return WindowGenerator(24, 24, 1,
+                           [StockColumn.clsprc.name],
+                           *split_to_dataframes(load_normalized_dataset('./data/sample.csv')))
 
 
 def test_window_generator_column_indices():
@@ -27,7 +36,16 @@ def test_window_generator_column_indices():
     19. precloseprice
     20. changeratio
     """
-    w = WindowGenerator(1, 1, 1, [StockColumn.clsprc.name], *split_to_dataframes(load_dataset('./data/sample.csv')))
+    window = WindowGenerator(24, 24, 1,
+                             [StockColumn.clsprc.name],
+                             *split_to_dataframes(
+                                 load_dataset('./data/sample.csv')))  # here we do not normalize it to preserve order
+    assert window.column_indices[StockColumn.stkcd.name] == 0
+    assert window.column_indices[StockColumn.precloseprice.name] == 19
 
-    assert w.column_indices[StockColumn.stkcd.name] == 0
-    assert w.column_indices[StockColumn.precloseprice.name] == 19
+
+def test_example(window):
+    example = window.example
+    # 33 is the total number of features (including the label) (21 + 6 * 2, for two date columns)
+    assert example[0].shape == (32, 24, 33)
+    assert example[1].shape == (32, 24, 1)

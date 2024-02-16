@@ -1,7 +1,7 @@
-import numpy as np
-from pandas import DataFrame
-import tensorflow as tf
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+from pandas import DataFrame
 
 
 class WindowGenerator:
@@ -58,8 +58,8 @@ class WindowGenerator:
         return self.make_dataset(self.test_df)
 
     @property
-    def example(self):
-        """Get and cache an example batch of `inputs, labels` for plotting."""
+    def example(self) -> tuple[tf.Tensor, tf.Tensor]:
+        """Get and cache a training example batch of `inputs, labels` for plotting."""
         result = getattr(self, '_example', None)
         if result is None:
             # No example batch was found, so get one from the `.train` dataset
