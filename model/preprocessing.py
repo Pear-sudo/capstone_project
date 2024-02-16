@@ -51,7 +51,7 @@ def is_valid_date(s: str) -> bool:
     return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
 
-def normalize_dataset(df: pd.DataFrame):
+def normalize_dataset(df: pd.DataFrame) -> None:
     date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
     for date_col in date_cols:
         normalize_date(df, date_col)
