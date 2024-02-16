@@ -48,4 +48,5 @@ def test_example(window):
     example = window.example
     # 33 is the total number of features (including the label) (21 + 6 * 2, for two date columns)
     assert example[0].shape == (32, 24, 33)
+    assert example[0].shape[0] == len(example[0])
     assert example[1].shape == (32, 24, 1)

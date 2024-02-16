@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from keras import Model
 from pandas import DataFrame
 
 
@@ -85,17 +86,30 @@ class WindowGenerator:
 
         return inputs, labels
 
-    def plot(self, plot_col, model=None, max_subplots=3):
-        inputs, labels = self.example
-        plt.figure(figsize=(12, 8))
+    def plot(self, plot_col: str, model: Model, max_subplots: int = 3):
+        """
+        The Plot is based on the example dataset.
+        :param plot_col: What you want to predict
+        :param model:
+        :param max_subplots:
+        :return:
+        """
+        inputs, labels = self.example  # they are just tensors
         plot_col_index = self.column_indices[plot_col]
-        max_n = min(max_subplots, len(inputs))
+        max_n = min(max_subplots, len(inputs))  # len(inputs) equals to inputs.shape[0], which is the batch axis
+
+        plt.figure(figsize=(12, 8))
+        # plot one window at a time (choose one from batch axis)
         for n in range(max_n):
+            # region inputs
             plt.subplot(max_n, 1, n + 1)
-            plt.ylabel(f'{plot_col} [normed]')
+            plt.ylabel(f'{plot_col}')
+            # x: input width start from 0; y: (batch, time width, feature), the label
             plt.plot(self.input_indices, inputs[n, :, plot_col_index],
                      label='Inputs', marker='.', zorder=-10)
+            # endregion
 
+            # region labels
             if self.label_columns:
                 label_col_index = self.label_columns_indices.get(plot_col, None)
             else:
@@ -106,24 +120,34 @@ class WindowGenerator:
 
             plt.scatter(self.label_indices, labels[n, :, label_col_index],
                         edgecolors='k', label='Labels', c='#2ca02c', s=64)
+            # endregion
+
+            # region predictions
             if model is not None:
                 predictions = model(inputs)
                 plt.scatter(self.label_indices, predictions[n, :, label_col_index],
                             marker='X', edgecolors='k', label='Predictions',
                             c='#ff7f0e', s=64)
+            # endregion
 
             if n == 0:
                 plt.legend()
 
         plt.xlabel('Time [d]')
 
-    def make_dataset(self, data):
+    def make_dataset(self, data: DataFrame):
         data = np.array(data, dtype=np.float32)
         ds: tf.data.Dataset = tf.keras.utils.timeseries_dataset_from_array(
             data=data,
             targets=None,
             sequence_length=self.total_window_size,  # the origin of time axis
             sequence_stride=1,
+            # There are actually three levels of order:
+            # Whole array --- batches
+            # One batch --- windows in each batch
+            # One window --- timepoints in each window
+            # It's VERY important to know that this shuffle only impacts the first level order;
+            # Time order in other levels are preserved.
             shuffle=True,
             batch_size=32, )  # that's how you get the batch axis in split_window's input
 
