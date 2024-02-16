@@ -1,3 +1,6 @@
 *.ipynb
 !notebooks/*.ipynb
+
+**/data/*.csv
+
 test.py
