@@ -9,8 +9,8 @@ class WindowGenerator:
     """
 
     def __init__(self, input_width: int, label_width: int, shift: int,
-                 train_df: DataFrame, val_df: DataFrame, test_df: DataFrame,
-                 label_columns: list[str]):
+                 label_columns: list[str],
+                 train_df: DataFrame, val_df: DataFrame, test_df: DataFrame):
         # Store the raw data.
         self.train_df = train_df
         self.val_df = val_df
@@ -21,8 +21,8 @@ class WindowGenerator:
         if label_columns is not None:
             self.label_columns_indices = {name: i for i, name in
                                           enumerate(label_columns)}
-        self.column_indices = {name: i for i, name in  # name is of type str
-                               enumerate(train_df.columns)}
+        self.column_indices: dict[str:int] = {name: i for i, name in  # name is of type str
+                                              enumerate(train_df.columns)}
 
         # Work out the window parameters.
         self.input_width = input_width
