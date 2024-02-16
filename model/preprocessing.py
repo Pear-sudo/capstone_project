@@ -32,20 +32,26 @@ def normalize_date(df: pd.DataFrame, date_column: str):
 
     df[date_column] = pd.to_datetime(df[date_column])
 
-    df['year_reduced'] = df[date_column].dt.year - df[date_column].dt.year.min()
+    df[f'{date_column}_year_reduced'] = df[date_column].dt.year - df[date_column].dt.year.min()
 
-    df['sin_month'] = np.sin(2 * np.pi * df[date_column].dt.month / 12)
-    df['cos_month'] = np.cos(2 * np.pi * df[date_column].dt.month / 12)
+    df[f'{date_column}_sin_month'] = np.sin(2 * np.pi * df[date_column].dt.month / 12)
+    df[f'{date_column}_cos_month'] = np.cos(2 * np.pi * df[date_column].dt.month / 12)
 
-    df['sin_day'] = np.sin(2 * np.pi * df[date_column].dt.day / 31)
-    df['cos_day'] = np.cos(2 * np.pi * df[date_column].dt.day / 31)
+    df[f'{date_column}_sin_day'] = np.sin(2 * np.pi * df[date_column].dt.day / 31)
+    df[f'{date_column}_cos_day'] = np.cos(2 * np.pi * df[date_column].dt.day / 31)
 
     # Monday=0, Sunday=6
-    df['sin_dayofweek'] = np.sin(2 * np.pi * df[date_column].dt.dayofweek / 7)
-    df['cos_dayofweek'] = np.cos(2 * np.pi * df[date_column].dt.dayofweek / 7)
+    df[f'{date_column}_sin_dayofweek'] = np.sin(2 * np.pi * df[date_column].dt.dayofweek / 7)
+    df[f'{date_column}_cos_dayofweek'] = np.cos(2 * np.pi * df[date_column].dt.dayofweek / 7)
 
     df.drop(date_column, axis=1, inplace=True)
 
 
 def is_valid_date(s: str) -> bool:
-    return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', s))
+    return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
+
+
+def normalize_dataset(df: pd.DataFrame):
+    date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
+    for date_col in date_cols:
+        normalize_date(df, date_col)

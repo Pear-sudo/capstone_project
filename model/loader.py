@@ -1,8 +1,10 @@
 import pandas as pd
+from model.preprocessing import *
 
 
 def load_dataset(path: str) -> pd.DataFrame:
-    return pd.read_csv(path)
+    df = pd.read_csv(path)
+    return df
 
 
 def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \

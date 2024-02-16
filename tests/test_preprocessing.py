@@ -5,9 +5,14 @@ from model.stocks import StockColumn
 
 def test_normalize_date():
     df = load_dataset('./data/sample.csv')
+
     date_col = StockColumn.trddt.name
     normalize_date(df, date_col)
-    assert all(column in df.columns for column in ['sin_dayofweek', 'sin_day', 'sin_month', 'year_reduced'])
+
+    expected_cols = ['sin_dayofweek', 'sin_day', 'sin_month', 'year_reduced']
+    expected_cols = [date_col + '_' + col for col in expected_cols]
+    assert all(column in df.columns for column in expected_cols)
+
     assert date_col not in df.columns
 
 
