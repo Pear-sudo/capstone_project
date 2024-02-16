@@ -1,5 +1,4 @@
 *.ipynb
-!notebooks/*.ipynb
 
 **/data/*.csv
 
