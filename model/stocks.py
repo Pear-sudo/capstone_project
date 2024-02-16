@@ -149,4 +149,4 @@ class Stock(Database):
 
 
 if __name__ == '__main__':
-    Stocks().export_to_csv(filename='../data/sample.csv')
+    Stocks().export_to_csv(filename='../tests/data/sample.csv')

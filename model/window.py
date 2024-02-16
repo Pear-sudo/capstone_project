@@ -119,14 +119,14 @@ class WindowGenerator:
 
     def make_dataset(self, data):
         data = np.array(data, dtype=np.float32)
-        ds = tf.keras.utils.timeseries_dataset_from_array(
+        ds: tf.data.Dataset = tf.keras.utils.timeseries_dataset_from_array(
             data=data,
             targets=None,
-            sequence_length=self.total_window_size,
+            sequence_length=self.total_window_size,  # the origin of time axis
             sequence_stride=1,
             shuffle=True,
-            batch_size=32, )
+            batch_size=32, )  # that's how you get the batch axis in split_window's input
 
-        ds = ds.map(self.split_window)
+        ds = ds.map(self.split_window)  # (batch, time, features)
 
         return ds
