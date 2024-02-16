@@ -1,14 +1,11 @@
-from typing import override
-
 import tensorflow as tf
 
 
 class Baseline(tf.keras.Model):
-    def __init__(self, label_index=None):
+    def __init__(self, label_index: int):
         super().__init__()
         self.label_index = label_index
 
-    @override
     def call(self, inputs, training=None, mask=None):
         if self.label_index is None:
             return inputs
