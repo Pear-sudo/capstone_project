@@ -1,10 +1,17 @@
+import pytest
+
 from model.loader import *
 from model.preprocessing import *
 from model.stocks import StockColumn
 
 
-def test_normalize_date():
-    df = load_dataset('./data/sample.csv')
+@pytest.fixture(scope="module")
+def data():
+    return load_dataset('./data/sample.csv')
+
+
+def test_normalize_date(data):
+    df = data
 
     date_col = StockColumn.trddt.name
     normalize_date(df, date_col)

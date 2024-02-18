@@ -47,11 +47,23 @@ def normalize_date(df: pd.DataFrame, date_column: str):
     df.drop(date_column, axis=1, inplace=True)
 
 
+def normalize_nan(df: pd.DataFrame):
+    """
+    Delete the columns whose values are all nan (not a number).
+    :param df:
+    :return:
+    """
+    df.dropna(axis=1, how="all", inplace=True)  # first deal columns
+    df.dropna(axis=0, how="any", inplace=True)  # then rows
+
+
 def is_valid_date(s: str) -> bool:
     return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
 
 def normalize_dataset(df: pd.DataFrame) -> None:
+    normalize_nan(df)
+
     date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
     for date_col in date_cols:
         normalize_date(df, date_col)
