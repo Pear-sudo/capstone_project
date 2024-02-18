@@ -220,7 +220,7 @@ class WindowGeneratorStock(WindowGenerator):
 
         super().__init__(input_width, label_width, shift, label_columns, data, train_df, val_df, test_df)
 
-    def plot(self, plot_col: Optional[str], model: Model, max_subplots: int = 3):
+    def plot(self, model: Model, plot_col: Optional[str] = None, max_subplots: int = 3):
         if plot_col is None:
             plot_col = WindowGeneratorStock.label_column
         super().plot(plot_col, model, max_subplots)
