@@ -140,7 +140,8 @@ class WindowGenerator:
             plt.subplot(max_n, 1, n + 1)
             plt.ylabel(f'{plot_col}')
             # x: input width start from 0; y: (batch, time width, feature), the label
-            plt.plot(self.input_indices, inputs[n, :, plot_col_index],
+            input_to_plot = inputs[n, :, plot_col_index]
+            plt.plot(self.input_indices, input_to_plot,
                      label='Inputs', marker='.', zorder=-10)
             # endregion
 
