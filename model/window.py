@@ -98,7 +98,10 @@ class WindowGenerator:
 
     @property
     def example(self) -> tuple[tf.Tensor, tf.Tensor]:
-        """Get and cache a training example batch of `inputs, labels` for plotting."""
+        """
+        Get and cache a training example batch of `inputs, labels` for plotting.
+        :return: [inputs tensor, labels tensor]
+        """
         result = getattr(self, '_example', None)
         if result is None:
             # No example batch was found, so get one from the `.train` dataset
@@ -124,11 +127,12 @@ class WindowGenerator:
 
         return inputs, labels
 
-    def plot(self, plot_col: str, model: Model, max_subplots: int = 3):
+    def plot(self, plot_col: str, model: Model = None, max_subplots: int = 3):
         """
         The Plot is based on the example dataset.
         :param plot_col: What you want to predict
-        :param model:
+        :param model: If provided, the prediction made by the model will be plotted;
+        otherwise, only inputs (of one feature, usually the target itself) and labels are plotted.
         :param max_subplots:
         :return:
         """
@@ -240,7 +244,7 @@ class WindowGeneratorStock(WindowGenerator):
 
         super().__init__(input_width, label_width, shift, label_columns, data, train_df, val_df, test_df)
 
-    def plot(self, plot_col: Optional[str], model: Model, max_subplots: int = 3):
+    def plot(self, plot_col: Optional[str] = None, model: Model = None, max_subplots: int = 3):
         if plot_col is None:
             plot_col = WindowGeneratorStock.label_column
         super().plot(plot_col, model, max_subplots)
