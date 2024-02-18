@@ -192,6 +192,20 @@ class WindowGeneratorStock(WindowGenerator):
     A window generator tailored for stock data.
     """
 
+    label_columns = [StockColumn.clsprc.name]
+
+    @classmethod
+    def get_single_step_window(
+            cls,
+            label_columns: Optional[list[str]] = None,
+            data: Optional[str | pd.DataFrame] = None,
+            train_df: Optional[DataFrame] = None,
+            val_df: Optional[DataFrame] = None,
+            test_df: Optional[DataFrame] = None) -> WindowGenerator:
+        if label_columns is None:
+            label_columns = cls.label_columns
+        return WindowGenerator(1, 1, 1, label_columns, data, train_df, val_df, test_df)
+
     def __init__(self,
                  input_width: int, label_width: int, shift: int,
                  label_columns: Optional[list[str]] = None,
@@ -199,9 +213,8 @@ class WindowGeneratorStock(WindowGenerator):
                  train_df: Optional[DataFrame] = None,
                  val_df: Optional[DataFrame] = None,
                  test_df: Optional[DataFrame] = None):
-
         # because the default value shall not be mutable, init the default value (which is a list) here.
         if label_columns is None:
-            label_columns = [StockColumn.clsprc.name]
+            label_columns = WindowGeneratorStock.label_columns
 
         super().__init__(input_width, label_width, shift, label_columns, data, train_df, val_df, test_df)
