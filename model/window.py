@@ -192,7 +192,8 @@ class WindowGeneratorStock(WindowGenerator):
     A window generator tailored for stock data.
     """
 
-    label_columns = [StockColumn.clsprc.name]
+    label_column = StockColumn.clsprc.name
+    label_columns = [label_column]
 
     @classmethod
     def get_single_step_window(
@@ -218,3 +219,8 @@ class WindowGeneratorStock(WindowGenerator):
             label_columns = WindowGeneratorStock.label_columns
 
         super().__init__(input_width, label_width, shift, label_columns, data, train_df, val_df, test_df)
+
+    def plot(self, plot_col: Optional[str], model: Model, max_subplots: int = 3):
+        if plot_col is None:
+            plot_col = WindowGeneratorStock.label_column
+        super().plot(plot_col, model, max_subplots)
