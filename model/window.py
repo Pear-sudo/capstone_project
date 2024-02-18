@@ -10,8 +10,8 @@ from keras import Model
 from pandas import DataFrame
 
 from model.loader import load_normalized_dataset, split_to_dataframes
-from model.stocks import StockColumn
 from model.preprocessing import post_normalize
+from model.stocks import StockColumn
 
 
 class WindowGenerator:
@@ -210,10 +210,22 @@ class WindowGeneratorStock(WindowGenerator):
             data: Optional[str | pd.DataFrame] = None,
             train_df: Optional[DataFrame] = None,
             val_df: Optional[DataFrame] = None,
-            test_df: Optional[DataFrame] = None) -> WindowGenerator:
+            test_df: Optional[DataFrame] = None) -> WindowGeneratorStock:
         if label_columns is None:
             label_columns = cls.label_columns
-        return WindowGenerator(1, 1, 1, label_columns, data, train_df, val_df, test_df)
+        return WindowGeneratorStock(1, 1, 1, label_columns, data, train_df, val_df, test_df)
+
+    @classmethod
+    def get_wide_step_window(
+            cls,
+            label_columns: Optional[list[str]] = None,
+            data: Optional[str | pd.DataFrame] = None,
+            train_df: Optional[DataFrame] = None,
+            val_df: Optional[DataFrame] = None,
+            test_df: Optional[DataFrame] = None) -> WindowGeneratorStock:
+        if label_columns is None:
+            label_columns = cls.label_columns
+        return WindowGeneratorStock(24, 24, 1, label_columns, data, train_df, val_df, test_df)
 
     def __init__(self,
                  input_width: int, label_width: int, shift: int,
