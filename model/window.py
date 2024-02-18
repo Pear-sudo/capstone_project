@@ -137,6 +137,8 @@ class WindowGenerator:
         :return:
         """
         inputs, labels = self.example  # they are just tensors
+        if type(plot_col) is not str:
+            raise ValueError('plot_col must be a string')
         plot_col_index = self.column_indices[plot_col]
         max_n = min(max_subplots, len(inputs))  # len(inputs) equals to inputs.shape[0], which is the batch axis
 
