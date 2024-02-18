@@ -48,6 +48,10 @@ class WindowGenerator:
             else:
                 raise ValueError('Neither dfs nor data is valid.')
 
+        # security check
+        if self.train_df is None or self.val_df is None or self.test_df is None:
+            raise RuntimeError('Some df is None for unknown reasons.')
+
         # Work out the label column indices (as a map).
         self.label_columns = label_columns
         if label_columns is not None:
