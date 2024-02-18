@@ -27,4 +27,7 @@ def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0
     val_df: pd.DataFrame = df[cut_train_val:cut_val_test]
     test_df: pd.DataFrame = df[cut_val_test:]
 
+    if train_df is None or val_df is None or test_df is None:
+        raise RuntimeError('Dataset is empty for unknown reasons.')
+
     return train_df, val_df, test_df

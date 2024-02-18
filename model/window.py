@@ -1,21 +1,51 @@
+from __future__ import annotations
+
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from keras import Model
 from pandas import DataFrame
+
+from model.loader import load_normalized_dataset, split_to_dataframes
 
 
 class WindowGenerator:
     """
     """
 
-    def __init__(self, input_width: int, label_width: int, shift: int,
+    @staticmethod
+    def get_single_step_window(
+            label_columns: list[str],
+            data: Optional[str | pd.DataFrame] = None,
+            train_df: Optional[DataFrame] = None,
+            val_df: Optional[DataFrame] = None,
+            test_df: Optional[DataFrame] = None) -> WindowGenerator:
+        return WindowGenerator(1, 1, 1, label_columns, data, train_df, val_df, test_df)
+
+    def __init__(self,
+                 input_width: int, label_width: int, shift: int,
                  label_columns: list[str],
-                 train_df: DataFrame, val_df: DataFrame, test_df: DataFrame):
-        # Store the raw data.
-        self.train_df = train_df
-        self.val_df = val_df
-        self.test_df = test_df
+                 data: Optional[str | pd.DataFrame] = None,
+                 train_df: Optional[DataFrame] = None,
+                 val_df: Optional[DataFrame] = None,
+                 test_df: Optional[DataFrame] = None):
+
+        if train_df is not None and val_df is not None and test_df is not None:
+            # Store the raw data.
+            self.train_df = train_df
+            self.val_df = val_df
+            self.test_df = test_df
+        else:
+            if type(data) is str:
+                data = load_normalized_dataset(data)
+
+            if type(data) is pd.DataFrame:
+                self.train_df, self.val_df, self.test_df = split_to_dataframes(data)
+            else:
+                raise ValueError('Neither dfs nor data is valid.')
 
         # Work out the label column indices (as a map).
         self.label_columns = label_columns
@@ -23,7 +53,7 @@ class WindowGenerator:
             self.label_columns_indices = {name: i for i, name in
                                           enumerate(label_columns)}
         self.column_indices: dict[str:int] = {name: i for i, name in  # name is of type str
-                                              enumerate(train_df.columns)}
+                                              enumerate(self.train_df.columns)}
 
         # Work out the window parameters.
         self.input_width = input_width

@@ -50,3 +50,8 @@ def test_example(window):
     assert example[0].shape == (32, 24, 33)
     assert example[0].shape[0] == len(example[0])
     assert example[1].shape == (32, 24, 1)
+
+
+def test_window_generator():
+    w = WindowGenerator(1, 1, 1, [StockColumn.clsprc.name], './data/sample.csv')
+    assert w.column_indices[StockColumn.stkcd.name] == 0
