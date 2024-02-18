@@ -10,6 +10,7 @@ from keras import Model
 from pandas import DataFrame
 
 from model.loader import load_normalized_dataset, split_to_dataframes
+from model.stocks import StockColumn
 
 
 class WindowGenerator:
@@ -184,3 +185,23 @@ class WindowGenerator:
         ds = ds.map(self.split_window)  # (batch, time, features)
 
         return ds
+
+
+class WindowGeneratorStock(WindowGenerator):
+    """
+    A window generator tailored for stock data.
+    """
+
+    def __init__(self,
+                 input_width: int, label_width: int, shift: int,
+                 label_columns: Optional[list[str]] = None,
+                 data: Optional[str | pd.DataFrame] = None,
+                 train_df: Optional[DataFrame] = None,
+                 val_df: Optional[DataFrame] = None,
+                 test_df: Optional[DataFrame] = None):
+
+        # because the default value shall not be mutable, init the default value (which is a list) here.
+        if label_columns is None:
+            label_columns = [StockColumn.clsprc.name]
+
+        super().__init__(input_width, label_width, shift, label_columns, data, train_df, val_df, test_df)
