@@ -3,9 +3,11 @@ import tensorflow as tf
 from model.window import WindowGenerator
 
 MAX_EPOCHS = 1000
+PATIENCE = 10
 
 
-def compile_and_fit(model: tf.keras.Model, window: WindowGenerator, patience: int = 2, max_epochs: int = MAX_EPOCHS):
+def compile_and_fit(model: tf.keras.Model, window: WindowGenerator, patience: int = PATIENCE,
+                    max_epochs: int = MAX_EPOCHS):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       patience=patience,
                                                       mode='min')  # for fit/training process only
