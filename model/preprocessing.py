@@ -57,13 +57,44 @@ def normalize_nan(df: pd.DataFrame):
     df.dropna(axis=0, how="any", inplace=True)  # then rows
 
 
+def normalize_values(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame):
+    # todo this is not correct: you should use moving averages
+    """
+    (v - mean) / std
+    :param
+    :return:
+    """
+    train_mean = train.mean()
+    train_std = train.std()
+
+    train = (train - train_mean) / train_std
+    val = (val - train_mean) / train_std  # again, this is to prevent data leakage
+    test = (test - train_mean) / train_std
+
+    return train, val, test
+
+
 def is_valid_date(s: str) -> bool:
     return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
 
 def normalize_dataset(df: pd.DataFrame) -> None:
-    normalize_nan(df)
-
     date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
     for date_col in date_cols:
         normalize_date(df, date_col)
+
+
+def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame):
+    """
+    for normalization that needs to be done differently in each dataset
+    :param
+    :return:
+    """
+    train, val, test = normalize_values(train, val, test)
+
+    # nan guard
+    normalize_nan(train)
+    normalize_nan(val)
+    normalize_nan(test)
+
+    return train, val, test

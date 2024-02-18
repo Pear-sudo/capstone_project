@@ -11,6 +11,7 @@ from pandas import DataFrame
 
 from model.loader import load_normalized_dataset, split_to_dataframes
 from model.stocks import StockColumn
+from model.preprocessing import post_normalize
 
 
 class WindowGenerator:
@@ -51,6 +52,8 @@ class WindowGenerator:
         # security check
         if self.train_df is None or self.val_df is None or self.test_df is None:
             raise RuntimeError('Some df is None for unknown reasons.')
+        else:
+            self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df)
 
         # Work out the label column indices (as a map).
         self.label_columns = label_columns

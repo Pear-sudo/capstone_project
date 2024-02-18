@@ -12,7 +12,7 @@ def window():
                            *split_to_dataframes(load_normalized_dataset('./data/sample.csv')))
 
 
-def test_window_generator_column_indices():
+def test_window_generator_column_indices(window):
     """
     0. stkcd
     1. trddt
@@ -36,12 +36,7 @@ def test_window_generator_column_indices():
     19. precloseprice
     20. changeratio
     """
-    window = WindowGenerator(24, 24, 1,
-                             [StockColumn.clsprc.name],
-                             *split_to_dataframes(
-                                 load_dataset('./data/sample.csv')))  # here we do not normalize it to preserve order
-    assert window.column_indices[StockColumn.stkcd.name] == 0
-    assert window.column_indices[StockColumn.precloseprice.name] == 19
+    indices_test(window)
 
 
 def test_example(window):
