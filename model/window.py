@@ -181,6 +181,15 @@ class WindowGenerator:
         plt.xlabel('Time [d]')
 
     def make_dataset(self, data: DataFrame):
+        """
+        This function assumes that the input data only contains one stock's data.
+        To train multi-stock models, you need to first divide each stock into sequences and then mixed them.
+        Use make_mixed_dataset() to achieve this.
+        :param data:
+        :return:
+        """
+        # note that this function's input is divided to train, validation and test,
+        # so shuffling should not bring leakage issues
         data = np.array(data, dtype=np.float32)
         ds: tf.data.Dataset = tf.keras.utils.timeseries_dataset_from_array(
             data=data,
@@ -199,6 +208,9 @@ class WindowGenerator:
         ds = ds.map(self.split_window)  # (batch, time, features)
 
         return ds
+
+    def make_mixed_dataset(self):
+        pass
 
 
 class WindowGeneratorStock(WindowGenerator):
