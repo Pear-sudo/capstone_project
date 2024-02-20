@@ -1,5 +1,5 @@
 *.ipynb
 
-**/data/*.csv
+**/data/**/*.csv
 
 test.py
