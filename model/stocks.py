@@ -1,4 +1,5 @@
 import csv
+import os
 from enum import Enum, auto
 from string import Template
 from typing import Optional
@@ -44,34 +45,50 @@ class Stocks(Database):
     def __init__(self):
         super().__init__()
         self.table_name = "stock"
+        self.stocks = None
 
     def list_stocks(self) -> list[str]:
-        stocks = self.get_connection().execute(f'select stkcd from {self.table_name} group by stkcd').fetchall()
-        stocks = [row[0] for row in stocks]
-        stocks.sort()
-        return stocks
+        if self.stocks is None:
+            stocks = self.get_connection().execute(f'select stkcd from {self.table_name} group by stkcd').fetchall()
+            stocks = [row[0] for row in stocks]
+            stocks.sort()
+            self.stocks = stocks
+        return self.stocks
 
-    def export_to_csv(self, filename: str = "../data/stocks.csv") -> None:
+    def export_to_csv(self, filename: str = "../data/stocks.csv",
+                      dir_name: str = "../data/raw",
+                      stocks: list[str] = None) -> None:
+        stocks_to_export = stocks
+        if stocks is None:
+            stocks_to_export = self.list_stocks()
+        else:
+            raise ValueError("Stock selection is not supported")  # TODO implement stock selection
+
         conn = self.get_connection()
         cur = conn.cursor(name="csv_exporter")
         cur.itersize = 10_000
         try:
-            cur.execute(f"SELECT * FROM {self.table_name} where stkcd = '000001'")
+            for stock in stocks_to_export:
+                filename = os.path.join(dir_name, f"{stock}.csv")
 
-            # Open the CSV file for writing
-            with open(filename, 'w', newline='') as csvfile:
-                csvwriter = csv.writer(csvfile)
+                cur.execute(f"SELECT * FROM {self.table_name} where stkcd = '{stock}' order by trddt")
 
-                # Write the column headers
-                col_names = [desc[0] for desc in cur.description]
-                csvwriter.writerow(col_names)
+                # Open the CSV file for writing
+                with open(filename, 'w', newline='') as csvfile:
+                    csvwriter = csv.writer(csvfile)
 
-                # Write the rows of data
-                while True:
-                    rows = cur.fetchmany(cur.itersize)
-                    if not rows:
-                        break
-                    csvwriter.writerows(rows)
+                    # Write the column headers
+                    col_names = [desc[0] for desc in cur.description]
+                    csvwriter.writerow(col_names)
+
+                    # Write the rows of data
+                    while True:
+                        rows = cur.fetchmany(cur.itersize)
+                        if not rows:
+                            break
+                        csvwriter.writerows(rows)
+
+                print(f"Stock {stock} exported to {filename}")
 
         except Exception as e:
             print("Error: ", e)
@@ -149,4 +166,4 @@ class Stock(Database):
 
 
 if __name__ == '__main__':
-    Stocks().export_to_csv(filename='../tests/data/sample.csv')
+    Stocks().export_to_csv()
