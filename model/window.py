@@ -35,25 +35,13 @@ class WindowGenerator:
                  val_df: Optional[DataFrame] = None,
                  test_df: Optional[DataFrame] = None):
 
-        if train_df is not None and val_df is not None and test_df is not None:
-            # Store the raw data.
-            self.train_df = train_df
-            self.val_df = val_df
-            self.test_df = test_df
-        else:
-            if type(data) is str:
-                data = load_normalized_dataset(data)
+        self.train_df = train_df
+        self.val_df = val_df
+        self.test_df = test_df
 
-            if type(data) is pd.DataFrame:
-                self.train_df, self.val_df, self.test_df = split_to_dataframes(data)
-            else:
-                raise ValueError('Neither dfs nor data is valid.')
+        self.data = data
 
-        # security check
-        if self.train_df is None or self.val_df is None or self.test_df is None:
-            raise RuntimeError('Some df is None for unknown reasons.')
-        else:
-            self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df)
+        self.import_data()
 
         # Work out the label column indices (as a map).
         self.label_columns = label_columns
@@ -76,6 +64,24 @@ class WindowGenerator:
         self.label_start = self.total_window_size - self.label_width
         self.labels_slice = slice(self.label_start, None)
         self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
+
+    def import_data(self):
+        if self.train_df is not None and self.val_df is not None and self.test_df is not None:
+            pass
+        else:
+            if type(self.data) is str:
+                data = load_normalized_dataset(self.data)
+
+            if type(self.data) is pd.DataFrame:
+                self.train_df, self.val_df, self.test_df = split_to_dataframes(data)
+            else:
+                raise ValueError('Neither dfs nor data is valid.')
+
+        # security check
+        if self.train_df is None or self.val_df is None or self.test_df is None:
+            raise RuntimeError('Some df is None for unknown reasons.')
+        else:
+            self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df)
 
     def __repr__(self):
         return '\n'.join([
