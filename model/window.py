@@ -70,10 +70,10 @@ class WindowGenerator:
             pass
         else:
             if type(self.data) is str:
-                data = load_normalized_dataset(self.data)
+                self.data = load_normalized_dataset(self.data)
 
             if type(self.data) is pd.DataFrame:
-                self.train_df, self.val_df, self.test_df = split_to_dataframes(data)
+                self.train_df, self.val_df, self.test_df = split_to_dataframes(self.data)
             else:
                 raise ValueError('Neither dfs nor data is valid.')
 
