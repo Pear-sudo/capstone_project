@@ -56,7 +56,7 @@ class Stocks(Database):
         return self.stocks
 
     def export_to_csv(self, filename: str = "../data/stocks.csv",
-                      dir_name: str = "../data/raw",
+                      dir_name: str = "../data/raw/stocks",
                       stocks: list[str] = None) -> None:
         stocks_to_export = stocks
         if stocks is None:
