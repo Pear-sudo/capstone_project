@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os.path
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -70,10 +71,14 @@ class WindowGenerator:
             pass
         else:
             if type(self.data) is str:
-                self.data = load_normalized_dataset(self.data)
-
-            if type(self.data) is pd.DataFrame:
-                self.train_df, self.val_df, self.test_df = split_to_dataframes(self.data)
+                if os.path.isfile(self.data):
+                    self.import_from_file()
+                elif os.path.isdir(self.data):
+                    self.import_from_directory()
+                else:
+                    raise ValueError(f"{self.data} is not a valid file or directory")
+            elif type(self.data) is pd.DataFrame:
+                self.import_from_dataframe()
             else:
                 raise ValueError('Neither dfs nor data is valid.')
 
@@ -82,6 +87,16 @@ class WindowGenerator:
             raise RuntimeError('Some df is None for unknown reasons.')
         else:
             self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df)
+
+    def import_from_dataframe(self):
+        self.train_df, self.val_df, self.test_df = split_to_dataframes(self.data)
+
+    def import_from_file(self):
+        self.data = load_normalized_dataset(self.data)
+        self.import_from_dataframe()
+
+    def import_from_directory(self):
+        pass
 
     def __repr__(self):
         return '\n'.join([
