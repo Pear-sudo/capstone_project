@@ -36,9 +36,16 @@ class WindowGenerator:
                  val_df: Optional[DataFrame] = None,
                  test_df: Optional[DataFrame] = None):
 
+        self.is_mixed_dataset = False
+
         self.train_df = train_df
         self.val_df = val_df
         self.test_df = test_df
+
+        # for mixed dataset only
+        self.train_dfs = None
+        self.val_dfs = None
+        self.test_dfs = None
 
         self.data = data
 
@@ -74,6 +81,8 @@ class WindowGenerator:
                 if os.path.isfile(self.data):
                     self.import_from_file()
                 elif os.path.isdir(self.data):
+                    self.data = os.path.abspath(self.data)
+                    self.is_mixed_dataset = True
                     self.import_from_directory()
                 else:
                     raise ValueError(f"{self.data} is not a valid file or directory")
@@ -96,7 +105,15 @@ class WindowGenerator:
         self.import_from_dataframe()
 
     def import_from_directory(self):
-        pass
+        files = os.listdir(self.data)
+        datasets = [load_normalized_dataset(os.path.join(self.data, file)) for file in files]
+        del files
+        spilt_datasets = [split_to_dataframes(dataset) for dataset in datasets]
+        del datasets
+        post_normalized_spilt_datasets = [post_normalize(*s_dataset) for s_dataset in spilt_datasets]
+        del spilt_datasets
+        # the memory consumption at this point is about 559M
+        self.train_dfs, self.val_dfs, self.test_dfs = zip(*post_normalized_spilt_datasets)
 
     def __repr__(self):
         return '\n'.join([

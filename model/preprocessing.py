@@ -84,7 +84,8 @@ def normalize_dataset(df: pd.DataFrame) -> None:
         normalize_date(df, date_col)
 
 
-def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame):
+def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     for normalization that needs to be done differently in each dataset
     :param
