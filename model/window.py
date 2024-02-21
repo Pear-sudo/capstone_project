@@ -91,14 +91,14 @@ class WindowGenerator:
             else:
                 raise ValueError('Neither dfs nor data is valid.')
 
-            # security check
-            if self.train_df is None or self.val_df is None or self.test_df is None:
-                raise RuntimeError('Some df is None for unknown reasons.')
-            else:
-                self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df)
-
     def import_from_dataframe(self):
         self.train_df, self.val_df, self.test_df = split_to_dataframes(self.data)
+
+        # security check
+        if self.train_df is None or self.val_df is None or self.test_df is None:
+            raise RuntimeError('Some df is None for unknown reasons.')
+        else:
+            self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df)
 
     def import_from_file(self):
         self.data = load_normalized_dataset(self.data)
