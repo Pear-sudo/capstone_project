@@ -260,8 +260,30 @@ class WindowGenerator:
 
         return ds
 
-    def make_mixed_dataset(self, data: list[DataFrame]):
-        pass
+    def make_mixed_dataset(self, dataframes: tuple[DataFrame, ...]):
+        datasets = []
+
+        for dataframe in dataframes:
+            data = np.array(dataframe, dtype=np.float32)
+            del dataframe
+
+            ds = tf.keras.utils.timeseries_dataset_from_array(
+                data=data,
+                targets=None,
+                sequence_length=self.total_window_size,
+                sequence_stride=1,
+                shuffle=False,  # Shuffling happens after combining the datasets
+                batch_size=32,
+            )
+
+            ds = ds.map(self.split_window)
+            datasets.append(ds)
+
+        combined_ds = tf.data.Dataset.sample_from_datasets(datasets)
+
+        combined_ds = combined_ds.shuffle(buffer_size=1000)
+
+        return combined_ds
 
 
 class WindowGeneratorStock(WindowGenerator):
