@@ -43,9 +43,9 @@ class WindowGenerator:
         self.test_df = test_df
 
         # for mixed dataset only
-        self.train_dfs = None
-        self.val_dfs = None
-        self.test_dfs = None
+        self.train_dfs: tuple[DataFrame, ...] | None = None
+        self.val_dfs: tuple[DataFrame, ...] | None = None
+        self.test_dfs: tuple[DataFrame, ...] | None = None
 
         self.data = data
 
@@ -56,8 +56,12 @@ class WindowGenerator:
         if label_columns is not None:
             self.label_columns_indices = {name: i for i, name in
                                           enumerate(label_columns)}
-        self.column_indices: dict[str:int] = {name: i for i, name in  # name is of type str
-                                              enumerate(self.train_df.columns)}
+        if not self.is_mixed_dataset:
+            self.column_indices: dict[str:int] = {name: i for i, name in  # name is of type str
+                                                  enumerate(self.train_df.columns)}
+        else:
+            self.column_indices: dict[str:int] = {name: i for i, name in
+                                                  enumerate(self.train_dfs[0].columns)}
 
         # Work out the window parameters.
         self.input_width = input_width
