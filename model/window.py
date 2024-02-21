@@ -111,13 +111,24 @@ class WindowGenerator:
     def import_from_directory(self):
         files = os.listdir(self.data)
         datasets = [load_normalized_dataset(os.path.join(self.data, file)) for file in files]
+        features = [dataset.shape[1] for dataset in datasets]
+        self.check_features(features)
         del files
         spilt_datasets = [split_to_dataframes(dataset) for dataset in datasets]
         del datasets
         post_normalized_spilt_datasets = [post_normalize(*s_dataset) for s_dataset in spilt_datasets]
         del spilt_datasets
+        features = [t[0].shape[1] for t in post_normalized_spilt_datasets]
+        self.check_features(features)
         # the memory consumption at this point is about 559M
         self.train_dfs, self.val_dfs, self.test_dfs = zip(*post_normalized_spilt_datasets)
+
+    def check_features(self, features: list[int]):
+        if len(set(features)) != 1:
+            print(len(set(features)))
+            print(features)
+            print(set(features))
+            exit(1)
 
     def __repr__(self):
         return '\n'.join([
@@ -231,7 +242,7 @@ class WindowGenerator:
 
         plt.xlabel('Time [d]')
 
-    def make_dataset(self, data: DataFrame):
+    def make_dataset(self, data: DataFrame):  # there should be 29 features
         """
         This function assumes that the input data only contains one stock's data.
         To train multi-stock models, you need to first divide each stock into sequences and then mixed them.
@@ -261,6 +272,8 @@ class WindowGenerator:
         return ds
 
     def make_mixed_dataset(self, dataframes: tuple[DataFrame, ...]):
+        # dataframes = [d for d in dataframes if d.shape[1] == 28]
+        # print(len(dataframes))
         datasets = []
 
         for dataframe in dataframes:
