@@ -124,15 +124,24 @@ class WindowGenerator:
 
     @property
     def train(self):
-        return self.make_dataset(self.train_df)
+        if self.is_mixed_dataset:
+            return self.make_mixed_dataset(self.train_dfs)
+        else:
+            return self.make_dataset(self.train_df)
 
     @property
     def val(self):
-        return self.make_dataset(self.val_df)
+        if self.is_mixed_dataset:
+            return self.make_mixed_dataset(self.val_dfs)
+        else:
+            return self.make_dataset(self.val_df)
 
     @property
     def test(self):
-        return self.make_dataset(self.test_df)
+        if self.is_mixed_dataset:
+            return self.make_mixed_dataset(self.test_dfs)
+        else:
+            return self.make_dataset(self.test_df)
 
     @property
     def example(self) -> tuple[tf.Tensor, tf.Tensor]:
@@ -247,7 +256,7 @@ class WindowGenerator:
 
         return ds
 
-    def make_mixed_dataset(self):
+    def make_mixed_dataset(self, data: list[DataFrame]):
         pass
 
 
