@@ -18,7 +18,7 @@ class StockLoadingStrategy(LoadingStrategy):
         self.conditions = {
             "trdsta": 1,
         }
-        self.exclude = ['markettype', 'capchgdt']
+        self.exclude = ['markettype', 'capchgdt', 'trdsta']
 
 
 class Normalizer:
@@ -42,7 +42,7 @@ from stats
         pass
 
 
-def normalize_date(df: pd.DataFrame, date_column: str):
+def normalize_date(df: pd.DataFrame, date_column: str) -> pd.DataFrame:
     sample = df[date_column].iloc[0]
     if not is_valid_date(sample):
         raise ValueError('It seems like the specified column is not of the form YYYY-MM-DD.')
@@ -62,6 +62,7 @@ def normalize_date(df: pd.DataFrame, date_column: str):
     df[f'{date_column}_cos_dayofweek'] = np.cos(2 * np.pi * df[date_column].dt.dayofweek / 7)
 
     df.drop(date_column, axis=1, inplace=True)
+    return df
 
 
 def normalize_nan(df: pd.DataFrame):
@@ -95,10 +96,18 @@ def is_valid_date(s: str) -> bool:
     return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
 
-def normalize_dataset(df: pd.DataFrame, strategy: LoadingStrategy) -> None:
+def normalize_dataset(df: pd.DataFrame, strategy: LoadingStrategy = LoadingStrategy()) -> pd.DataFrame:
+    for column in df.columns:
+        if column in strategy.conditions:
+            df = df[df[column] == strategy.conditions[column]]
+        if column in strategy.exclude:
+            df.drop(column, axis=1, inplace=True)
+
     date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
     for date_col in date_cols:
-        normalize_date(df, date_col)
+        df = normalize_date(df, date_col)
+
+    return df
 
 
 def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> tuple[
