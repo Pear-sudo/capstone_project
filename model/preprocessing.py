@@ -1,7 +1,24 @@
 import re
+from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
+
+
+class LoadingStrategy:
+    def __init__(self):
+        self.include: list[str] = []
+        self.exclude: list[str] = []
+        self.conditions: Mapping[str, Any] = {}
+
+
+class StockLoadingStrategy(LoadingStrategy):
+    def __init__(self):
+        super().__init__()
+        self.conditions = {
+            "trdsta": 1,
+        }
+        self.exclude = ['markettype', 'capchgdt']
 
 
 class Normalizer:
@@ -78,7 +95,7 @@ def is_valid_date(s: str) -> bool:
     return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
 
-def normalize_dataset(df: pd.DataFrame) -> None:
+def normalize_dataset(df: pd.DataFrame, strategy: LoadingStrategy) -> None:
     date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
     for date_col in date_cols:
         normalize_date(df, date_col)

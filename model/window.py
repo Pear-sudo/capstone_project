@@ -119,7 +119,7 @@ class WindowGenerator:
         post_normalized_spilt_datasets = [post_normalize(*s_dataset) for s_dataset in spilt_datasets]
         del spilt_datasets
         features = [t[0].shape[1] for t in post_normalized_spilt_datasets]
-        self.check_features(features)
+        self.check_features(features)  # this often goes wrong
         # the memory consumption at this point is about 559M
         self.train_dfs, self.val_dfs, self.test_dfs = zip(*post_normalized_spilt_datasets)
 
