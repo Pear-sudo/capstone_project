@@ -1,5 +1,5 @@
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,13 @@ class LoadingStrategy:
         self.exclude: list[str] = []
         self.conditions: Mapping[str, Any] = {}
 
+        # raw (unprocessed) columns count
+        self.raw_columns: Optional[int] = None
+        # how many columns you would expect after all the processing
+        self.expected_columns: Optional[int] = None
+
+        self.beginning_year = None
+
 
 class StockLoadingStrategy(LoadingStrategy):
     def __init__(self):
@@ -19,6 +26,14 @@ class StockLoadingStrategy(LoadingStrategy):
             "trdsta": 1,
         }
         self.exclude = ['markettype', 'capchgdt', 'trdsta']
+        self.exclude.append('stkcd')  # use embedding to handle 300 hundred categorical data; needs a lot of work;
+        # forget about it for now
+        self.exclude += ['ahshrtrd_d', 'ahvaltrd_d']  # these columns often produce NaN after normalization
+
+        self.raw_columns = 21
+        self.expected_columns = 21 - len(self.exclude) + 6 * 1  # one date column would need additional 6 columns
+
+        self.beginning_year = 1991
 
 
 class Normalizer:
@@ -42,14 +57,17 @@ from stats
         pass
 
 
-def normalize_date(df: pd.DataFrame, date_column: str) -> pd.DataFrame:
+def normalize_date(df: pd.DataFrame, date_column: str, strategy: LoadingStrategy = LoadingStrategy()) -> pd.DataFrame:
     sample = df[date_column].iloc[0]
     if not is_valid_date(sample):
         raise ValueError('It seems like the specified column is not of the form YYYY-MM-DD.')
 
     df[date_column] = pd.to_datetime(df[date_column])
 
-    df[f'{date_column}_year_reduced'] = df[date_column].dt.year - df[date_column].dt.year.min()
+    base_year = strategy.beginning_year
+    if base_year is None:
+        base_year = df[date_column].dt.year.min()
+    df[f'{date_column}_year_reduced'] = df[date_column].dt.year - base_year
 
     df[f'{date_column}_sin_month'] = np.sin(2 * np.pi * df[date_column].dt.month / 12)
     df[f'{date_column}_cos_month'] = np.cos(2 * np.pi * df[date_column].dt.month / 12)
@@ -75,7 +93,8 @@ def normalize_nan(df: pd.DataFrame):
     df.dropna(axis=0, how="any", inplace=True)  # then rows
 
 
-def normalize_values(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame):
+def normalize_values(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
+                     strategy: LoadingStrategy = LoadingStrategy()) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     # todo this is not correct: you should use moving averages
     """
     (v - mean) / std
@@ -96,32 +115,42 @@ def is_valid_date(s: str) -> bool:
     return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
 
-def normalize_dataset(df: pd.DataFrame, strategy: LoadingStrategy = LoadingStrategy()) -> pd.DataFrame:
+def normalize_dataset(df: pd.DataFrame, strategy: LoadingStrategy = LoadingStrategy()) -> Optional[pd.DataFrame]:
+    if len(df.columns) != strategy.raw_columns and strategy.raw_columns is not None:
+        raise ValueError(f"Expected {strategy.raw_columns} raw columns, found {len(df.columns)}")
+
     for column in df.columns:
         if column in strategy.conditions:
             df = df[df[column] == strategy.conditions[column]]
         if column in strategy.exclude:
             df.drop(column, axis=1, inplace=True)
 
-    date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
+    try:
+        date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
+    except IndexError:
+        # this df has no rows after filtering
+        return None
     for date_col in date_cols:
-        df = normalize_date(df, date_col)
+        df = normalize_date(df, date_col, strategy)
 
     return df
 
 
-def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> tuple[
+def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
+                   strategy: LoadingStrategy = LoadingStrategy()) -> tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     for normalization that needs to be done differently in each dataset
     :param
     :return:
     """
-    train, val, test = normalize_values(train, val, test)
+    train, val, test = normalize_values(train, val, test, strategy)
 
     # nan guard
     normalize_nan(train)
     normalize_nan(val)
     normalize_nan(test)
 
+    if len(train.columns) != strategy.expected_columns and strategy.expected_columns is not None:
+        raise ValueError(f"Expected {strategy.expected_columns}, got {len(train.columns)} during post normalization")
     return train, val, test

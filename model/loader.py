@@ -6,7 +6,7 @@ def load_dataset(path: str) -> pd.DataFrame:
     return df
 
 
-def load_normalized_dataset(path: str, strategy: LoadingStrategy = StockLoadingStrategy()) -> pd.DataFrame:
+def load_normalized_dataset(path: str, strategy: LoadingStrategy = StockLoadingStrategy()) -> Optional[pd.DataFrame]:
     df = load_dataset(path)
     df = normalize_dataset(df, strategy)
     return df
