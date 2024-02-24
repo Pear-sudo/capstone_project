@@ -10,8 +10,7 @@ import tensorflow as tf
 from keras import Model
 from pandas import DataFrame
 
-from model.loader import load_normalized_dataset, split_to_dataframes
-from model.preprocessing import post_normalize, StockLoadingStrategy
+from model.preprocessing import Preprocessor, StockLoadingStrategy
 from model.stocks import StockColumn
 
 
@@ -35,6 +34,8 @@ class WindowGenerator:
                  train_df: Optional[DataFrame] = None,
                  val_df: Optional[DataFrame] = None,
                  test_df: Optional[DataFrame] = None):
+
+        self.preprocessor = Preprocessor(StockLoadingStrategy())
 
         self.is_mixed_dataset = False
 
@@ -98,31 +99,31 @@ class WindowGenerator:
                 raise ValueError('Neither dfs nor data is valid.')
 
     def import_from_dataframe(self):
-        self.train_df, self.val_df, self.test_df = split_to_dataframes(self.data)
+        self.train_df, self.val_df, self.test_df = self.preprocessor.split_to_dataframes(self.data)
 
         # security check
         if self.train_df is None or self.val_df is None or self.test_df is None:
             raise RuntimeError('Some df is None for unknown reasons.')
         else:
-            self.train_df, self.val_df, self.test_df = post_normalize(self.train_df, self.val_df, self.test_df,
-                                                                      strategy=StockLoadingStrategy())
+            self.train_df, self.val_df, self.test_df = self.preprocessor.post_normalize(self.train_df,
+                                                                                        self.val_df, self.test_df, )
 
     def import_from_file(self):
-        self.data = load_normalized_dataset(self.data)
+        self.data = self.preprocessor.load_normalized_dataset(self.data)
         if self.data is None:
             raise ValueError(f'No data is left after filtering {self.path}')
         self.import_from_dataframe()
 
     def import_from_directory(self):
         files = os.listdir(self.data)
-        datasets = [load_normalized_dataset(os.path.join(self.data, file)) for file in files]
+        datasets = [self.preprocessor.load_normalized_dataset(os.path.join(self.data, file)) for file in files]
         datasets = [dataset for dataset in datasets if dataset is not None]
         features = [dataset.shape[1] for dataset in datasets]
         self.check_features(features)
         del files
-        spilt_datasets = [split_to_dataframes(dataset) for dataset in datasets]
+        spilt_datasets = [self.preprocessor.split_to_dataframes(dataset) for dataset in datasets]
         del datasets
-        post_normalized_spilt_datasets = [post_normalize(*s_dataset, strategy=StockLoadingStrategy()) for s_dataset in
+        post_normalized_spilt_datasets = [self.preprocessor.post_normalize(*s_dataset) for s_dataset in
                                           spilt_datasets]
         del spilt_datasets
         features = [t[0].shape[1] for t in post_normalized_spilt_datasets]
