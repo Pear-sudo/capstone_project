@@ -59,100 +59,103 @@ from stats
         pass
 
 
-def normalize_date(df: pd.DataFrame, date_column: str, strategy: LoadingStrategy = LoadingStrategy()) -> pd.DataFrame:
-    sample = df[date_column].iloc[0]
-    if not is_valid_date(sample):
-        raise ValueError('It seems like the specified column is not of the form YYYY-MM-DD.')
+class Preprocessor:
+    def __init__(self):
+        pass
 
-    df[date_column] = pd.to_datetime(df[date_column])
+    def normalize_date(self, df: pd.DataFrame, date_column: str,
+                       strategy: LoadingStrategy = LoadingStrategy()) -> pd.DataFrame:
+        sample = df[date_column].iloc[0]
+        if not self.is_valid_date(sample):
+            raise ValueError('It seems like the specified column is not of the form YYYY-MM-DD.')
 
-    base_year = strategy.beginning_year
-    if base_year is None:
-        base_year = df[date_column].dt.year.min()
-    df[f'{date_column}_year_reduced'] = df[date_column].dt.year - base_year
+        df[date_column] = pd.to_datetime(df[date_column])
 
-    df[f'{date_column}_sin_month'] = np.sin(2 * np.pi * df[date_column].dt.month / 12)
-    df[f'{date_column}_cos_month'] = np.cos(2 * np.pi * df[date_column].dt.month / 12)
+        base_year = strategy.beginning_year
+        if base_year is None:
+            base_year = df[date_column].dt.year.min()
+        df[f'{date_column}_year_reduced'] = df[date_column].dt.year - base_year
 
-    df[f'{date_column}_sin_day'] = np.sin(2 * np.pi * df[date_column].dt.day / 31)
-    df[f'{date_column}_cos_day'] = np.cos(2 * np.pi * df[date_column].dt.day / 31)
+        df[f'{date_column}_sin_month'] = np.sin(2 * np.pi * df[date_column].dt.month / 12)
+        df[f'{date_column}_cos_month'] = np.cos(2 * np.pi * df[date_column].dt.month / 12)
 
-    # Monday=0, Sunday=6
-    df[f'{date_column}_sin_dayofweek'] = np.sin(2 * np.pi * df[date_column].dt.dayofweek / 7)
-    df[f'{date_column}_cos_dayofweek'] = np.cos(2 * np.pi * df[date_column].dt.dayofweek / 7)
+        df[f'{date_column}_sin_day'] = np.sin(2 * np.pi * df[date_column].dt.day / 31)
+        df[f'{date_column}_cos_day'] = np.cos(2 * np.pi * df[date_column].dt.day / 31)
 
-    df.drop(date_column, axis=1, inplace=True)
-    return df
+        # Monday=0, Sunday=6
+        df[f'{date_column}_sin_dayofweek'] = np.sin(2 * np.pi * df[date_column].dt.dayofweek / 7)
+        df[f'{date_column}_cos_dayofweek'] = np.cos(2 * np.pi * df[date_column].dt.dayofweek / 7)
 
+        df.drop(date_column, axis=1, inplace=True)
+        return df
 
-def normalize_nan(df: pd.DataFrame):
-    """
-    Delete the columns whose values are all nan (not a number).
-    :param df:
-    :return:
-    """
-    df.dropna(axis=1, how="all", inplace=True)  # first deal columns
-    df.dropna(axis=0, how="any", inplace=True)  # then rows
+    def normalize_nan(self, df: pd.DataFrame):
+        """
+        Delete the columns whose values are all nan (not a number).
+        :param df:
+        :return:
+        """
+        df.dropna(axis=1, how="all", inplace=True)  # first deal columns
+        df.dropna(axis=0, how="any", inplace=True)  # then rows
 
+    def normalize_values(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
+                         strategy: LoadingStrategy = LoadingStrategy()) -> tuple[
+        pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        # todo this is not correct: you should use moving averages
+        """
+        (v - mean) / std
+        :param
+        :return:
+        """
+        train_mean = train.mean()
+        train_std = train.std()
 
-def normalize_values(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
-                     strategy: LoadingStrategy = LoadingStrategy()) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    # todo this is not correct: you should use moving averages
-    """
-    (v - mean) / std
-    :param
-    :return:
-    """
-    train_mean = train.mean()
-    train_std = train.std()
+        train = (train - train_mean) / train_std
+        val = (val - train_mean) / train_std  # again, this is to prevent data leakage
+        test = (test - train_mean) / train_std
 
-    train = (train - train_mean) / train_std
-    val = (val - train_mean) / train_std  # again, this is to prevent data leakage
-    test = (test - train_mean) / train_std
+        return train, val, test
 
-    return train, val, test
+    def is_valid_date(self, s: str) -> bool:
+        return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
+    def normalize_dataset(self, df: pd.DataFrame, strategy: LoadingStrategy = LoadingStrategy()) -> Optional[
+        pd.DataFrame]:
+        if len(df.columns) != strategy.raw_columns and strategy.raw_columns is not None:
+            raise ValueError(f"Expected {strategy.raw_columns} raw columns, found {len(df.columns)}")
 
-def is_valid_date(s: str) -> bool:
-    return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
+        for column in df.columns:
+            if column in strategy.conditions:
+                df = df[df[column] == strategy.conditions[column]]
+            if column in strategy.exclude:
+                df.drop(column, axis=1, inplace=True)
 
+        try:
+            date_cols: list[str] = [col for col in df.columns if self.is_valid_date(df[col].iloc[0])]
+        except IndexError:
+            # this df has no rows after filtering
+            return None
+        for date_col in date_cols:
+            df = self.normalize_date(df, date_col, strategy)
 
-def normalize_dataset(df: pd.DataFrame, strategy: LoadingStrategy = LoadingStrategy()) -> Optional[pd.DataFrame]:
-    if len(df.columns) != strategy.raw_columns and strategy.raw_columns is not None:
-        raise ValueError(f"Expected {strategy.raw_columns} raw columns, found {len(df.columns)}")
+        return df
 
-    for column in df.columns:
-        if column in strategy.conditions:
-            df = df[df[column] == strategy.conditions[column]]
-        if column in strategy.exclude:
-            df.drop(column, axis=1, inplace=True)
+    def post_normalize(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
+                       strategy: LoadingStrategy = LoadingStrategy()) -> tuple[
+        pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        for normalization that needs to be done differently in each dataset
+        :param
+        :return:
+        """
+        train, val, test = self.normalize_values(train, val, test, strategy)
 
-    try:
-        date_cols: list[str] = [col for col in df.columns if is_valid_date(df[col].iloc[0])]
-    except IndexError:
-        # this df has no rows after filtering
-        return None
-    for date_col in date_cols:
-        df = normalize_date(df, date_col, strategy)
+        # nan guard
+        self.normalize_nan(train)
+        self.normalize_nan(val)
+        self.normalize_nan(test)
 
-    return df
-
-
-def post_normalize(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
-                   strategy: LoadingStrategy = LoadingStrategy()) -> tuple[
-    pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    for normalization that needs to be done differently in each dataset
-    :param
-    :return:
-    """
-    train, val, test = normalize_values(train, val, test, strategy)
-
-    # nan guard
-    normalize_nan(train)
-    normalize_nan(val)
-    normalize_nan(test)
-
-    if len(train.columns) != strategy.expected_columns and strategy.expected_columns is not None:
-        raise ValueError(f"Expected {strategy.expected_columns}, got {len(train.columns)} during post normalization")
-    return train, val, test
+        if len(train.columns) != strategy.expected_columns and strategy.expected_columns is not None:
+            raise ValueError(
+                f"Expected {strategy.expected_columns}, got {len(train.columns)} during post normalization")
+        return train, val, test
