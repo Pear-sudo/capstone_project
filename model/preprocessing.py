@@ -60,18 +60,17 @@ from stats
 
 
 class Preprocessor:
-    def __init__(self):
-        pass
+    def __init__(self, strategy: LoadingStrategy):
+        self.strategy = strategy
 
-    def normalize_date(self, df: pd.DataFrame, date_column: str,
-                       strategy: LoadingStrategy = LoadingStrategy()) -> pd.DataFrame:
+    def normalize_date(self, df: pd.DataFrame, date_column: str) -> pd.DataFrame:
         sample = df[date_column].iloc[0]
         if not self.is_valid_date(sample):
             raise ValueError('It seems like the specified column is not of the form YYYY-MM-DD.')
 
         df[date_column] = pd.to_datetime(df[date_column])
 
-        base_year = strategy.beginning_year
+        base_year = self.strategy.beginning_year
         if base_year is None:
             base_year = df[date_column].dt.year.min()
         df[f'{date_column}_year_reduced'] = df[date_column].dt.year - base_year
@@ -98,9 +97,8 @@ class Preprocessor:
         df.dropna(axis=1, how="all", inplace=True)  # first deal columns
         df.dropna(axis=0, how="any", inplace=True)  # then rows
 
-    def normalize_values(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
-                         strategy: LoadingStrategy = LoadingStrategy()) -> tuple[
-        pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def normalize_values(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) \
+            -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         # todo this is not correct: you should use moving averages
         """
         (v - mean) / std
@@ -119,15 +117,15 @@ class Preprocessor:
     def is_valid_date(self, s: str) -> bool:
         return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
-    def normalize_dataset(self, df: pd.DataFrame, strategy: LoadingStrategy = LoadingStrategy()) -> Optional[
+    def normalize_dataset(self, df: pd.DataFrame) -> Optional[
         pd.DataFrame]:
-        if len(df.columns) != strategy.raw_columns and strategy.raw_columns is not None:
-            raise ValueError(f"Expected {strategy.raw_columns} raw columns, found {len(df.columns)}")
+        if len(df.columns) != self.strategy.raw_columns and self.strategy.raw_columns is not None:
+            raise ValueError(f"Expected {self.strategy.raw_columns} raw columns, found {len(df.columns)}")
 
         for column in df.columns:
-            if column in strategy.conditions:
-                df = df[df[column] == strategy.conditions[column]]
-            if column in strategy.exclude:
+            if column in self.strategy.conditions:
+                df = df[df[column] == self.strategy.conditions[column]]
+            if column in self.strategy.exclude:
                 df.drop(column, axis=1, inplace=True)
 
         try:
@@ -136,26 +134,25 @@ class Preprocessor:
             # this df has no rows after filtering
             return None
         for date_col in date_cols:
-            df = self.normalize_date(df, date_col, strategy)
+            df = self.normalize_date(df, date_col)
 
         return df
 
-    def post_normalize(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
-                       strategy: LoadingStrategy = LoadingStrategy()) -> tuple[
-        pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def post_normalize(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) \
+            -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         for normalization that needs to be done differently in each dataset
         :param
         :return:
         """
-        train, val, test = self.normalize_values(train, val, test, strategy)
+        train, val, test = self.normalize_values(train, val, test)
 
         # nan guard
         self.normalize_nan(train)
         self.normalize_nan(val)
         self.normalize_nan(test)
 
-        if len(train.columns) != strategy.expected_columns and strategy.expected_columns is not None:
+        if len(train.columns) != self.strategy.expected_columns and self.strategy.expected_columns is not None:
             raise ValueError(
-                f"Expected {strategy.expected_columns}, got {len(train.columns)} during post normalization")
+                f"Expected {self.strategy.expected_columns}, got {len(train.columns)} during post normalization")
         return train, val, test
