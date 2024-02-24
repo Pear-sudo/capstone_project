@@ -1,3 +1,5 @@
+import platform
+
 import tensorflow as tf
 
 from model.window import WindowGenerator
@@ -12,8 +14,13 @@ def compile_and_fit(model: tf.keras.Model, window: WindowGenerator, patience: in
                                                       patience=patience,
                                                       mode='min')  # for fit/training process only
 
+    if platform.system() == "Darwin" and platform.processor() == "arm":
+        opt = tf.keras.optimizers.legacy.Adam()
+    else:
+        opt = tf.keras.optimizers.Adam()
+
     model.compile(loss=tf.keras.losses.MeanSquaredError(),
-                  optimizer=tf.keras.optimizers.Adam(),
+                  optimizer=opt,
                   metrics=[tf.keras.metrics.MeanAbsoluteError()])
 
     history = model.fit(window.train, epochs=max_epochs,
