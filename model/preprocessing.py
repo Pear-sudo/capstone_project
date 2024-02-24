@@ -4,6 +4,8 @@ from typing import Any, Mapping, Optional
 import numpy as np
 import pandas as pd
 
+pd.options.mode.copy_on_write = True
+
 
 class LoadingStrategy:
     def __init__(self):
