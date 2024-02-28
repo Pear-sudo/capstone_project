@@ -1,5 +1,7 @@
 import os
+import re
 import zipfile
+from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from typing import Callable
@@ -9,6 +11,64 @@ def config_csmar_data(directory: PathLike | str):
     zip_files = filter_zip_files(directory)
     data_dirs = unzip_all(zip_files)
     print(f"Found {len(data_dirs)} data directories")
+
+
+@dataclass
+class CsmarColumnInfo:
+    column_name: str
+    full_name: str
+    explanation: str
+
+
+class CsmarDatasheet:
+    def __init__(self, datasheet_path: PathLike | str):
+        self.datasheet_path = Path(datasheet_path)
+        if not self.datasheet_path.is_file() and self.datasheet_path.suffix == ".txt":
+            raise ValueError(f"Datasheet file {datasheet_path} is not valid")
+        self.data_name: str = ''
+        self.column_infos: list[CsmarColumnInfo] = []
+        self._load_data_name()
+        self._load_column_infos()
+
+    def _load_data_name(self):
+        dir_path = self.datasheet_path.parent
+        if not dir_path.is_dir():
+            raise ValueError(f"Datasheet {self.datasheet_path} is not residing in a standard csmar directory")
+        dir_name = dir_path.name
+        data_name = re.findall(r'(.*)\d{9}', dir_name)
+        if len(data_name) != 1:
+            raise ValueError(f"{dir_path} is not a valid csmar directory")
+        self.data_name = data_name[0]
+
+    def _load_column_infos(self):
+        with open(self.datasheet_path, 'r') as datasheet:
+            for line in datasheet:
+                splits = line.split(' - ')
+                if len(splits) != 2:
+                    raise RuntimeError(f"Unexpected line {line} in {self.datasheet_path}")
+
+                combo = splits[0]
+                explanation = splits[1]
+                if explanation == "\n":
+                    explanation = ""
+
+                full_name = re.findall(r'\[(.*?)]', combo)
+                # ? here is to make the match not greedy, so nested [] are not allowed
+                if len(full_name) != 1:
+                    raise RuntimeError(f"There should be exactly one pair of [], found {len(full_name)} in {line} at "
+                                       f"{self.datasheet_path}")
+                full_name = full_name[0]
+                full_name = full_name.strip()
+
+                column_name = re.findall(r'(.*?)\[.*?]', combo)
+                if len(column_name) != 1:
+                    raise RuntimeError(f"There should be exactly one name before [], found {len(full_name)} in {line} "
+                                       f"at {self.datasheet_path}")
+                column_name = column_name[0]
+                column_name = column_name.strip()
+
+                column_info = CsmarColumnInfo(column_name, full_name, explanation)
+                self.column_infos.append(column_info)
 
 
 def unzip_all(zip_files: list[Path]) -> list[Path]:
@@ -115,7 +175,9 @@ def examine_csmar_dir(directory: PathLike | str) -> bool:
 
 
 if __name__ == '__main__':
-    config_csmar_data(r'/Users/a/playground/freestyle/')
+    CsmarDatasheet(
+        r'/Users/a/playground/freestyle/China Economic Research Series/Population Aging/Population/Population by Country_Region175929675/PAG_CounRegPopY[DES][csv].txt')
+    # config_csmar_data(r'/Users/a/playground/freestyle/')
     # filter_zip_files(r'/Users/a/playground/freestyle/')
     # examine_csmar_dir(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220')
     # unzip(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220.zip')
