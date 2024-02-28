@@ -5,17 +5,19 @@ from pathlib import Path
 from typing import Callable
 
 
-def unzip_all(zip_files: list[Path]) -> bool:
+def unzip_all(zip_files: list[Path]) -> list[Path]:
     non_zip_files = [str(file) for file in zip_files if not is_zipfile(file)]
     if non_zip_files:
         raise ValueError("Those files are not zip:\n {}".format('\n'.join(non_zip_files)))
 
+    unzipped_to: list[Path] = []
     for zip_file in zip_files:
         print('Unzipping {}'.format(zip_file.name))
-        unzip(zip_file)
+        path = unzip(zip_file)
+        unzipped_to.append(path)
         print('Unzipped {}'.format(zip_file.name))
 
-    return False
+    return unzipped_to
 
 
 def filter_zip_files(directory: PathLike | str) -> list[Path]:
