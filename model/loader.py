@@ -6,11 +6,15 @@ from os import PathLike
 from pathlib import Path
 from typing import Callable
 
+from typing_extensions import Iterable
 
-def config_csmar_data(directory: PathLike | str):
-    zip_files = filter_zip_files(directory)
-    data_dirs = unzip_all(zip_files)
-    print(f"Found {len(data_dirs)} data directories")
+
+@dataclass
+class CsmarDirectory:
+    csmar_dir: Path
+    data: Path
+    datasheet: Path
+    copy_right: Path
 
 
 @dataclass
@@ -18,6 +22,19 @@ class CsmarColumnInfo:
     column_name: str
     full_name: str
     explanation: str
+
+
+def config_csmar_data(directory: PathLike | str):
+    zip_files = filter_zip_files(directory)
+    data_dirs: Iterable[CsmarDirectory] = map(examine_csmar_dir, unzip_all(zip_files))
+    csmar_data: list[CsmarData] = list(map(CsmarData, data_dirs))
+    print(f"Found {len(csmar_data)} csmar data directories")
+
+
+class CsmarData:
+    def __init__(self, csmar_directory: CsmarDirectory):
+        self.csmar_directory = csmar_directory
+        self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
 
 
 class CsmarDatasheet:
@@ -38,21 +55,21 @@ class CsmarDatasheet:
         data_name = re.findall(r'(.*)\d{9}', dir_name)
         if len(data_name) != 1:
             raise ValueError(f"{dir_path} is not a valid csmar directory")
-        self.data_name = data_name[0]
+        self.data_name = data_name[0].strip()
 
     def _load_column_infos(self):
         with open(self.datasheet_path, 'r') as datasheet:
             for line in datasheet:
-                splits = line.split(' - ')
-                if len(splits) != 2:
-                    raise RuntimeError(f"Unexpected line {line} in {self.datasheet_path}")
+                # let's consider this: 'Gdpq0102 [Gdp - Primary Industry] - Calculated at current prices'
+                # I omit /n because the last column may not have that.
 
-                combo = splits[0]
-                explanation = splits[1]
-                if explanation == "\n":
-                    explanation = ""
+                explanation = re.findall(r'] - (.*)$', line)
+                if len(explanation) != 1:
+                    raise RuntimeError(f'There should be exactly one after " - ", found {len(explanation)} in {line} '
+                                       f'at {self.datasheet_path}')
+                explanation = explanation[0]
 
-                full_name = re.findall(r'\[(.*?)]', combo)
+                full_name = re.findall(r'\[(.*?)]', line)
                 # ? here is to make the match not greedy, so nested [] are not allowed
                 if len(full_name) != 1:
                     raise RuntimeError(f"There should be exactly one pair of [], found {len(full_name)} in {line} at "
@@ -60,7 +77,7 @@ class CsmarDatasheet:
                 full_name = full_name[0]
                 full_name = full_name.strip()
 
-                column_name = re.findall(r'(.*?)\[.*?]', combo)
+                column_name = re.findall(r'(.*?)\[.*?]', line)
                 if len(column_name) != 1:
                     raise RuntimeError(f"There should be exactly one name before [], found {len(full_name)} in {line} "
                                        f"at {self.datasheet_path}")
@@ -136,7 +153,7 @@ def is_zipfile(file: Path) -> bool:
     return file.suffix == '.zip'
 
 
-def examine_csmar_dir(directory: PathLike | str) -> bool:
+def examine_csmar_dir(directory: PathLike | str) -> CsmarDirectory | None:
     """
     A typical csmar directory (with csv data) contains three files, for example:
     CME_Qgdp.csv
@@ -156,28 +173,36 @@ def examine_csmar_dir(directory: PathLike | str) -> bool:
     csv_count = 0
     txt_count = 0
 
+    csmar_dir = directory.absolute()
+    copyright_path = None
+    datasheet_path = None
+    data_path = None
+
     files = list(directory.iterdir())
     if len(files) != 3:
-        return False
+        return None
         # raise ValueError(f'There should be three files in {directory}, but got {len(files)}')
     for file in files:
         if file.name == copyright_file:
             copyright_count += 1
+            copyright_path = file.absolute()
         elif file.suffix == '.txt':
             txt_count += 1
+            datasheet_path = file.absolute()
         elif file.suffix == '.csv':
             csv_count += 1
+            data_path = file.absolute()
 
     if copyright_count == csv_count == txt_count == 1:
-        return True
+        return CsmarDirectory(csmar_dir, data_path, datasheet_path, copyright_path)
     else:
-        return False
+        return None
 
 
 if __name__ == '__main__':
-    CsmarDatasheet(
-        r'/Users/a/playground/freestyle/China Economic Research Series/Population Aging/Population/Population by Country_Region175929675/PAG_CounRegPopY[DES][csv].txt')
-    # config_csmar_data(r'/Users/a/playground/freestyle/')
+    # CsmarDatasheet(
+    #     r'/Users/a/playground/freestyle/China Economic Research Series/Population Aging/Population/Population by Country_Region175929675/PAG_CounRegPopY[DES][csv].txt')
+    config_csmar_data(r'/Users/a/playground/freestyle/')
     # filter_zip_files(r'/Users/a/playground/freestyle/')
     # examine_csmar_dir(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220')
     # unzip(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220.zip')
