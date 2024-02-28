@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import Callable
 
 
+def config_csmar_data(directory: PathLike | str):
+    zip_files = filter_zip_files(directory)
+    data_dirs = unzip_all(zip_files)
+    print(f"Found {len(data_dirs)} data directories")
+
+
 def unzip_all(zip_files: list[Path]) -> list[Path]:
     non_zip_files = [str(file) for file in zip_files if not is_zipfile(file)]
     if non_zip_files:
@@ -12,10 +18,10 @@ def unzip_all(zip_files: list[Path]) -> list[Path]:
 
     unzipped_to: list[Path] = []
     for zip_file in zip_files:
-        print('Unzipping {}'.format(zip_file.name))
+        print('Unzipping "{}"'.format(zip_file.name))
         path = unzip(zip_file)
         unzipped_to.append(path)
-        print('Unzipped {}'.format(zip_file.name))
+        print('Unzipped "{}"'.format(zip_file.name))
 
     return unzipped_to
 
@@ -109,7 +115,7 @@ def examine_csmar_dir(directory: PathLike | str) -> bool:
 
 
 if __name__ == '__main__':
-    pass
-    filter_zip_files(r'/Users/a/playground/freestyle/')
+    config_csmar_data(r'/Users/a/playground/freestyle/')
+    # filter_zip_files(r'/Users/a/playground/freestyle/')
     # examine_csmar_dir(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220')
     # unzip(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220.zip')
