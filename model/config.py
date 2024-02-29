@@ -6,6 +6,18 @@ class DataConfigLayout:
     root: Path
     configured: str = 'configured'
     ignored: str = 'ignored'
+    backup: str = 'backup'
+
+
+def make_layout(layout: DataConfigLayout):
+    root: Path = layout.__dict__['root']
+    root = root.absolute()
+    for key, value in layout.__dict__.items():
+        if key == 'root':
+            continue
+        directory = root.joinpath(value)
+        if not directory.exists():
+            directory.mkdir()
 
 
 class DataConfig:
@@ -23,4 +35,4 @@ class DataConfig:
 
 
 if __name__ == '__main__':
-    pass
+    make_layout(DataConfigLayout(Path('./config/data')))
