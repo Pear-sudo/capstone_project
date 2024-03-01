@@ -6,6 +6,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Callable
 
+import pandas as pd
 from typing_extensions import Iterable
 
 
@@ -65,6 +66,11 @@ class CsmarDatasheet:
 
                 explanation = re.findall(r'] - (.*)$', line)
                 if len(explanation) != 1:
+                    if len(explanation) == 0:
+                        self.column_infos[-1].explanation += line
+                        continue
+                        # Datatype [Data Type] - 1=Industry value added (calculated at current price, unit: CNY100 million);
+                        # 2=Growth of industry value added
                     raise RuntimeError(f'There should be exactly one after " - ", found {len(explanation)} in {line} '
                                        f'at {self.datasheet_path}')
                 explanation = explanation[0]
@@ -134,7 +140,9 @@ def unzip(file: str | PathLike) -> Path:
     if directory.is_file():
         raise RuntimeError(f'Target directory {directory} is a file')
     elif directory.is_dir():
-        if examine_csmar_dir(directory):
+        if len(list(directory.iterdir())) == 0:
+            pass
+        elif examine_csmar_dir(directory):
             return directory
         else:
             raise RuntimeError(f'Target directory {directory} exists but its content is dubious')
@@ -176,12 +184,9 @@ def examine_csmar_dir(directory: PathLike | str) -> CsmarDirectory | None:
     csmar_dir = directory.absolute()
     copyright_path = None
     datasheet_path = None
-    data_path = None
+    data_path = []
 
     files = list(directory.iterdir())
-    if len(files) != 3:
-        return None
-        # raise ValueError(f'There should be three files in {directory}, but got {len(files)}')
     for file in files:
         if file.name == copyright_file:
             copyright_count += 1
@@ -191,10 +196,41 @@ def examine_csmar_dir(directory: PathLike | str) -> CsmarDirectory | None:
             datasheet_path = file.absolute()
         elif file.suffix == '.csv':
             csv_count += 1
-            data_path = file.absolute()
+            data_path.append(file.absolute())
+
+    if csv_count > 1:
+        names = [p.name for p in data_path]
+        main_name = None
+        count = 0
+        for name in names:
+            if not re.match(r'.*\d+\.csv$', name):
+                if main_name is None:
+                    main_name = name
+                else:
+                    raise RuntimeError('Duplicate main name found')
+            else:
+                count += 1
+
+        if main_name:
+            count += 1
+        else:
+            raise RuntimeError('Cannot find main name')
+        if count != len(data_path):
+            raise RuntimeError('Unknown situation')
+
+        save_to = data_path[0].parent.joinpath(main_name)
+        comb = pd.concat(map(pd.read_csv, data_path))
+
+        for p in data_path:
+            os.remove(p)
+
+        comb.to_csv(save_to, index=False)
+
+        data_path = [save_to]
+        csv_count = 1
 
     if copyright_count == csv_count == txt_count == 1:
-        return CsmarDirectory(csmar_dir, data_path, datasheet_path, copyright_path)
+        return CsmarDirectory(csmar_dir, data_path[0], datasheet_path, copyright_path)
     else:
         return None
 
