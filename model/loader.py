@@ -25,13 +25,6 @@ class CsmarColumnInfo:
     explanation: str
 
 
-def config_csmar_data(directory: PathLike | str):
-    zip_files = filter_zip_files(directory)
-    data_dirs: Iterable[CsmarDirectory] = map(examine_csmar_dir, unzip_all(zip_files))
-    csmar_data: list[CsmarData] = list(map(CsmarData, data_dirs))
-    print(f"Found {len(csmar_data)} csmar data directories")
-
-
 class CsmarData:
     def __init__(self, csmar_directory: CsmarDirectory):
         self.csmar_directory = csmar_directory
@@ -219,7 +212,7 @@ def examine_csmar_dir(directory: PathLike | str) -> CsmarDirectory | None:
             raise RuntimeError('Unknown situation')
 
         save_to = data_path[0].parent.joinpath(main_name)
-        comb = pd.concat(map(pd.read_csv, data_path))
+        comb = pd.concat(map(pd.read_csv, data_path))  # todo performance optimization
 
         for p in data_path:
             os.remove(p)
@@ -235,10 +228,18 @@ def examine_csmar_dir(directory: PathLike | str) -> CsmarDirectory | None:
         return None
 
 
+def load_csmar_data(directory: PathLike | str) -> list[CsmarData]:
+    zip_files = filter_zip_files(directory)
+    data_dirs: Iterable[CsmarDirectory] = map(examine_csmar_dir, unzip_all(zip_files))
+    csmar_data: list[CsmarData] = list(map(CsmarData, data_dirs))
+    print(f"Found {len(csmar_data)} csmar data directories")
+    return csmar_data
+
+
 if __name__ == '__main__':
     # CsmarDatasheet(
     #     r'/Users/a/playground/freestyle/China Economic Research Series/Population Aging/Population/Population by Country_Region175929675/PAG_CounRegPopY[DES][csv].txt')
-    config_csmar_data(r'/Users/a/playground/freestyle/')
+    load_csmar_data(r'/Users/a/playground/freestyle/')
     # filter_zip_files(r'/Users/a/playground/freestyle/')
     # examine_csmar_dir(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220')
     # unzip(r'/Users/a/playground/freestyle/China Economic Research Series/Macroeconomic/Gdp/Quarterly Gross Domestic Product181521220.zip')

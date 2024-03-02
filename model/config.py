@@ -35,4 +35,5 @@ class DataConfig:
 
 
 if __name__ == '__main__':
-    make_layout(DataConfigLayout(Path('./config/data')))
+    # make_layout(DataConfigLayout(Path('./config/data')))
+    load_csmar_data(r'/Users/a/playground/freestyle/')
