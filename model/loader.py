@@ -1,6 +1,7 @@
 import os
 import re
 import zipfile
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -8,6 +9,12 @@ from typing import Callable
 
 import pandas as pd
 from typing_extensions import Iterable
+
+
+class Serializable(ABC):
+    @abstractmethod
+    def serialize(self) -> dict:
+        pass
 
 
 @dataclass
@@ -19,10 +26,18 @@ class CsmarDirectory:
 
 
 @dataclass
-class CsmarColumnInfo:
+class CsmarColumnInfo(Serializable):
     column_name: str
     full_name: str
     explanation: str
+
+    def serialize(self) -> dict:
+        return {
+            'column_name': self.column_name,
+            'full_name': self.full_name,
+            'explanation': self.explanation,
+            'enabled': ''
+        }
 
 
 class CsmarData:
@@ -31,7 +46,7 @@ class CsmarData:
         self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
 
 
-class CsmarDatasheet:
+class CsmarDatasheet(Serializable):
     def __init__(self, datasheet_path: PathLike | str):
         self.datasheet_path = Path(datasheet_path)
         if not self.datasheet_path.is_file() and self.datasheet_path.suffix == ".txt":
@@ -40,6 +55,15 @@ class CsmarDatasheet:
         self.column_infos: list[CsmarColumnInfo] = []
         self._load_data_name()
         self._load_column_infos()
+
+    def serialize(self) -> dict:
+        columns: list = [column.serialize() for column in self.column_infos]
+        return {
+            'name': self.data_name,
+            'path': str(self.datasheet_path.absolute()),
+            'disabled': '',
+            'columns': columns
+        }
 
     def _load_data_name(self):
         dir_path = self.datasheet_path.parent

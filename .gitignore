@@ -1,5 +1,6 @@
 *.ipynb
 
 **/data/**/*.csv
+model/config/data/**
 
 test.py

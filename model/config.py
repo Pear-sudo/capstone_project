@@ -1,3 +1,5 @@
+import yaml
+
 from loader import *
 
 
@@ -25,7 +27,16 @@ class DataConfig:
         self.layout: DataConfigLayout = layout
 
     def make_config(self, datas: list[CsmarData]):
-        pass
+        datasheets: Iterable[CsmarDatasheet] = map(lambda data: data.csmar_datasheet, datas)
+        suffix = '.yaml'
+        for datasheet in datasheets:
+            serialized_datasheet = datasheet.serialize()
+            name = datasheet.data_name
+            save_to = self.layout.root.joinpath(name + suffix)
+            with open(save_to, 'w') as f:
+                yaml.dump(serialized_datasheet, f, sort_keys=False)
+            print(f"Saved '{name}' to '{save_to}'")
+            exit(0)
 
     def clean_config(self):
         pass
@@ -36,4 +47,5 @@ class DataConfig:
 
 if __name__ == '__main__':
     # make_layout(DataConfigLayout(Path('./config/data')))
-    load_csmar_data(r'/Users/a/playground/freestyle/')
+    csmar_datas = load_csmar_data(r'/Users/a/playground/freestyle/')
+    DataConfig(DataConfigLayout(Path('./config/data'))).make_config(csmar_datas)
