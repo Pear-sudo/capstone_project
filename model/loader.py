@@ -11,6 +11,43 @@ import pandas as pd
 from typing_extensions import Iterable
 
 
+def head(filename: Path, n=10) -> list[str]:
+    with open(filename, 'r', encoding='utf-8') as file:
+        lines = []
+        for _ in range(n):
+            line = file.readline().strip()
+            if not line:
+                break
+            lines.append(line)
+        return lines
+
+
+def tail(filename: Path, n=10) -> list[str]:
+    with open(filename, 'rb') as file:
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        buffer_size = 1024
+        data = ''
+        lines_found = []
+
+        while file.tell() > 0 and len(lines_found) < n:
+            cursor = min(buffer_size, file.tell())
+            file.seek(-cursor, 1)  # move up a bit
+            data = file.read(cursor).decode('utf-8') + data
+            file.seek(-cursor, 1)  # as read operation moved the position down
+            lines_found = data.splitlines()
+
+        return lines_found[-n:]  # it is possible that one bunch of data contains more than one lines
+
+
+def remove_quotes(text: str) -> str:
+    return text.replace('"', '').replace('\uFEFF', '')
+
+
+def remove_all_quotes(text: list[str]) -> list[str]:
+    return [remove_quotes(t) for t in text]
+
+
 class Serializable(ABC):
     @abstractmethod
     def serialize(self) -> dict:
@@ -40,10 +77,17 @@ class CsmarColumnInfo(Serializable):
         }
 
 
-class CsmarData:
+class CsmarData(Serializable):
     def __init__(self, csmar_directory: CsmarDirectory):
         self.csmar_directory = csmar_directory
         self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
+
+    def serialize(self) -> dict:
+        return {
+            **self.csmar_datasheet.serialize(),
+            'head': remove_all_quotes(head(self.csmar_directory.data)),
+            'tail': remove_all_quotes(tail(self.csmar_directory.data))
+        }
 
 
 class CsmarDatasheet(Serializable):
@@ -60,7 +104,7 @@ class CsmarDatasheet(Serializable):
         columns: list = [column.serialize() for column in self.column_infos]
         return {
             'name': self.data_name,
-            'path': str(self.datasheet_path.absolute()),
+            'path': str(self.datasheet_path.parent.absolute()),
             'disabled': '',
             'columns': columns
         }

@@ -27,11 +27,10 @@ class DataConfig:
         self.layout: DataConfigLayout = layout
 
     def make_config(self, datas: list[CsmarData]):
-        datasheets: Iterable[CsmarDatasheet] = map(lambda data: data.csmar_datasheet, datas)
         suffix = '.yaml'
-        for datasheet in datasheets:
-            serialized_datasheet = datasheet.serialize()
-            name = datasheet.data_name
+        for data in datas:
+            serialized_datasheet = data.serialize()
+            name = data.csmar_datasheet.data_name
             save_to = self.layout.root.joinpath(name + suffix)
             with open(save_to, 'w') as f:
                 yaml.dump(serialized_datasheet, f, sort_keys=False)
