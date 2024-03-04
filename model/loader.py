@@ -3,9 +3,10 @@ import re
 import zipfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from os import PathLike
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TypeVar
 
 import pandas as pd
 from typing_extensions import Iterable
@@ -48,10 +49,23 @@ def remove_all_quotes(text: list[str]) -> list[str]:
     return [remove_quotes(t) for t in text]
 
 
+T = TypeVar('T', bound='Serializable')
+
+
 class Serializable(ABC):
     @abstractmethod
     def serialize(self) -> dict:
         pass
+
+    @staticmethod
+    @abstractmethod
+    def deserialize(data: dict) -> T:
+        pass
+
+
+class Notation(Enum):
+    ENABLED = ['y', '1']
+    DISABLED = ['n', '0']
 
 
 @dataclass
@@ -76,8 +90,13 @@ class CsmarColumnInfo(Serializable):
             'enabled': ''
         }
 
+    @staticmethod
+    def deserialize(data: dict) -> T:
+        pass
+
 
 class CsmarData(Serializable):
+
     def __init__(self, csmar_directory: CsmarDirectory):
         self.csmar_directory = csmar_directory
         self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
@@ -89,8 +108,13 @@ class CsmarData(Serializable):
             'tail': remove_all_quotes(tail(self.csmar_directory.data))
         }
 
+    @staticmethod
+    def deserialize(data: dict) -> T:
+        pass
+
 
 class CsmarDatasheet(Serializable):
+
     def __init__(self, datasheet_path: PathLike | str):
         self.datasheet_path = Path(datasheet_path)
         if not self.datasheet_path.is_file() and self.datasheet_path.suffix == ".txt":
@@ -108,6 +132,10 @@ class CsmarDatasheet(Serializable):
             'disabled': '',
             'columns': columns
         }
+
+    @staticmethod
+    def deserialize(data: dict) -> T:
+        pass
 
     def _load_data_name(self):
         dir_path = self.datasheet_path.parent

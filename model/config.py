@@ -35,7 +35,6 @@ class DataConfig:
             with open(save_to, 'w') as f:
                 yaml.dump(serialized_datasheet, f, sort_keys=False)
             print(f"Saved '{name}' to '{save_to}'")
-            exit(0)
 
     def clean_config(self):
         pass
