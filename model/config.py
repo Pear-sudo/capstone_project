@@ -1,6 +1,5 @@
 import copy
 import datetime
-import shutil
 
 import yaml
 
@@ -46,6 +45,21 @@ def iter_dir(directory: Path,
             if_dir(path)
         else:
             if_else(path)
+
+
+def make_zipfile(output_path: Path, source_dir: Path, exclude_dirs: list[Path], ignore_system_files=True):
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_LZMA) as zipf:
+        for root, dirs, files in os.walk(source_dir):
+            root_path = Path(root)
+            dirs[:] = [d for d in dirs if root_path.joinpath(d) not in exclude_dirs]
+            for file in files:
+                file_path = root_path.joinpath(file)
+                if ignore_system_files:
+                    if file_path.stem == '.DS_Store':
+                        # '.DS_Store': custom attributes of its containing folder, such as the positions of icons
+                        continue
+                arcname = file_path.relative_to(source_dir)
+                zipf.write(file_path, arcname)
 
 
 class DataConfig:
@@ -105,8 +119,9 @@ class DataConfig:
                 raise RuntimeError(f"Config dir damaged: do not found {path}")
 
     def make_backup(self):
-        file_path = self.layout.backup
-        shutil.make_archive(dry_run=True, base_name=make_timestamp(), root_dir=self.layout.backup, )
+        output_path = self.layout.backup.joinpath(make_timestamp() + '.zip')
+        exclude = [self.layout.backup]
+        make_zipfile(output_path, self.layout.root, exclude)
 
 
 if __name__ == '__main__':

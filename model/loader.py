@@ -57,6 +57,10 @@ class Serializable(ABC):
     def serialize(self) -> dict:
         pass
 
+    @abstractmethod
+    def reconcile(self) -> T:
+        pass
+
     @staticmethod
     @abstractmethod
     def deserialize(data: dict) -> T:
@@ -90,6 +94,9 @@ class CsmarColumnInfo(Serializable):
             'enabled': ''
         }
 
+    def reconcile(self) -> T:
+        pass
+
     @staticmethod
     def deserialize(data: dict) -> T:
         pass
@@ -107,6 +114,9 @@ class CsmarData(Serializable):
             'head': remove_all_quotes(head(self.csmar_directory.data)),
             'tail': remove_all_quotes(tail(self.csmar_directory.data))
         }
+
+    def reconcile(self) -> T:
+        pass
 
     @staticmethod
     def deserialize(data: dict) -> T:
@@ -132,6 +142,9 @@ class CsmarDatasheet(Serializable):
             'disabled': '',
             'columns': columns
         }
+
+    def reconcile(self) -> T:
+        pass
 
     @staticmethod
     def deserialize(data: dict) -> T:
