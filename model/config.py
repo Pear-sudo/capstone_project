@@ -2,6 +2,7 @@ import copy
 import datetime
 
 import yaml
+from yaml import Loader
 
 from loader import *
 
@@ -84,7 +85,10 @@ class DataConfig:
         pass
 
     def load_config(self):
-        pass
+        self._find_config_files()
+        with open(self.configured[0], mode='r') as f:
+            y = yaml.load(f, Loader=Loader)
+            CsmarData.deserialize(y)
 
     def _find_config_files(self):
         def raise_error(p):
@@ -95,6 +99,8 @@ class DataConfig:
                 if p.is_file():
                     if p.suffix == '.yaml':
                         append_to.append(p)
+                    elif p.stem == '.DS_Store':
+                        return
                     else:
                         raise_error(p)
 
@@ -127,4 +133,4 @@ class DataConfig:
 if __name__ == '__main__':
     # make_layout(DataConfigLayout(Path('./config/data')))
     # csmar_datas = load_csmar_data(r'/Users/a/playground/freestyle/')
-    DataConfig(DataConfigLayout(Path('./config/data'))).make_backup()
+    DataConfig(DataConfigLayout(Path('./config/data'))).load_config()

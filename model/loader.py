@@ -63,6 +63,11 @@ class Serializable(ABC):
 
     @staticmethod
     @abstractmethod
+    def struct() -> dict[str, None]:
+        pass
+
+    @staticmethod
+    @abstractmethod
     def deserialize(data: dict) -> T:
         pass
 
@@ -86,6 +91,10 @@ class CsmarColumnInfo(Serializable):
     full_name: str
     explanation: str
 
+    @staticmethod
+    def struct() -> dict[str, None]:
+        return {}
+
     def serialize(self) -> dict:
         return {
             'column_name': self.column_name,
@@ -99,14 +108,27 @@ class CsmarColumnInfo(Serializable):
 
     @staticmethod
     def deserialize(data: dict) -> T:
-        pass
+        column_name: str = data['column_name']
+        full_name: str = data['full_name']
+        explanation: str = data['explanation']
+        column_info = CsmarColumnInfo(column_name, full_name, explanation)
+        return column_info
 
 
 class CsmarData(Serializable):
 
-    def __init__(self, csmar_directory: CsmarDirectory):
-        self.csmar_directory = csmar_directory
-        self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
+    def __init__(self, csmar_directory: CsmarDirectory = None, manual: bool = False):
+        if not manual:
+            self.csmar_directory = csmar_directory
+            self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
+
+    @staticmethod
+    def struct() -> dict[str, None]:
+        return {
+            **CsmarDatasheet.struct(),
+            'head': None,
+            'tail': None
+        }
 
     def serialize(self) -> dict:
         return {
@@ -120,19 +142,36 @@ class CsmarData(Serializable):
 
     @staticmethod
     def deserialize(data: dict) -> T:
-        pass
+        del data['head']
+        del data['tail']
+
+        csmar_directory_path = data['path']
+        csmar_directory = examine_csmar_dir(csmar_directory_path)
+        csmar_data = CsmarData(manual=True)
+        csmar_data.csmar_directory = csmar_directory
+
+        csmar_datasheet = CsmarDatasheet.deserialize(data)
+
+        csmar_data.csmar_datasheet = csmar_datasheet
+
+        return csmar_data
 
 
 class CsmarDatasheet(Serializable):
 
-    def __init__(self, datasheet_path: PathLike | str):
-        self.datasheet_path = Path(datasheet_path)
-        if not self.datasheet_path.is_file() and self.datasheet_path.suffix == ".txt":
-            raise ValueError(f"Datasheet file {datasheet_path} is not valid")
-        self.data_name: str = ''
-        self.column_infos: list[CsmarColumnInfo] = []
-        self._load_data_name()
-        self._load_column_infos()
+    def __init__(self, datasheet_path: PathLike | str = None, manual: bool = False):
+        if not manual:
+            self.datasheet_path = Path(datasheet_path)
+            if not self.datasheet_path.is_file() and self.datasheet_path.suffix == ".txt":
+                raise ValueError(f"Datasheet file {datasheet_path} is not valid")
+            self.data_name: str = ''
+            self.column_infos: list[CsmarColumnInfo] = []
+            self._load_data_name()
+            self._load_column_infos()
+
+    @staticmethod
+    def struct() -> dict[str, None]:
+        return {}
 
     def serialize(self) -> dict:
         columns: list = [column.serialize() for column in self.column_infos]
@@ -148,7 +187,16 @@ class CsmarDatasheet(Serializable):
 
     @staticmethod
     def deserialize(data: dict) -> T:
-        pass
+        csmar_datasheet = CsmarDatasheet(manual=True)
+        csmar_datasheet.datasheet_path = examine_csmar_dir(data['path']).datasheet
+        csmar_datasheet.data_name = data['name']
+
+        columns_data = data['columns']
+        columns = [CsmarColumnInfo.deserialize(d) for d in columns_data]
+
+        csmar_datasheet.column_infos = columns
+
+        return csmar_datasheet
 
     def _load_data_name(self):
         dir_path = self.datasheet_path.parent
