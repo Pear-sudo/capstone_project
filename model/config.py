@@ -1,5 +1,6 @@
 import copy
 import datetime
+import hashlib
 import shutil
 from itertools import chain
 
@@ -57,6 +58,19 @@ def iter_dir(directory: Path,
             if_dir(path)
         else:
             if_else(path)
+
+
+def latest_file(paths: Iterable[Path]) -> Path:
+    return max(paths, key=lambda path: path.stat().st_ctime)
+
+
+def hash_file(filename):
+    """Generate SHA-256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    with open(filename, 'rb') as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 
 def make_zipfile(output_path: Path, source_dir: Path, exclude_dirs: list[Path], ignore_system_files=True):
@@ -216,9 +230,16 @@ class DataConfig:
                 raise RuntimeError(f"Config dir damaged: do not found {path}")
 
     def make_backup(self):
+        # last_backup = latest_file(self.layout.backup.iterdir())
+        # old_hash = hash_file(last_backup)
+
         output_path = self.layout.backup.joinpath(make_timestamp() + '.zip')
         exclude = [self.layout.backup]
         make_zipfile(output_path, self.layout.root, exclude)
+        #
+        # new_hash = hash_file(output_path)
+        # if new_hash == old_hash:
+        #     os.remove(output_path)
 
 
 if __name__ == '__main__':
