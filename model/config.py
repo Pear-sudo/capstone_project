@@ -88,7 +88,8 @@ class DataConfig:
         self._find_config_files()
         with open(self.configured[0], mode='r') as f:
             y = yaml.load(f, Loader=Loader)
-            CsmarData.deserialize(y)
+            d = CsmarData.deserialize(y)
+            print(d)
 
     def _find_config_files(self):
         def raise_error(p):

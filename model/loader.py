@@ -3,10 +3,9 @@ import re
 import zipfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from os import PathLike
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, Optional
 
 import pandas as pd
 from typing_extensions import Iterable
@@ -72,9 +71,31 @@ class Serializable(ABC):
         pass
 
 
-class Notation(Enum):
+class Notation:
     ENABLED = ['y', '1']
     DISABLED = ['n', '0']
+
+    @classmethod
+    def deserialize(cls, data: str) -> Optional[bool]:
+        if data == '':
+            return None
+        elif data in cls.ENABLED:
+            return True
+        elif data in cls.DISABLED:
+            return False
+        else:
+            raise ValueError(f'"{data}" is not a valid notation')
+
+    @classmethod
+    def serialize(cls, data: Optional[bool]) -> str:
+        if data is None:
+            return ''
+        elif data is True:
+            return 'y'
+        elif data is False:
+            return 'n'
+        else:
+            raise ValueError(f'"{data}" is not a valid notation')
 
 
 @dataclass
@@ -90,6 +111,7 @@ class CsmarColumnInfo(Serializable):
     column_name: str
     full_name: str
     explanation: str
+    enabled: bool = None
 
     @staticmethod
     def struct() -> dict[str, None]:
@@ -100,18 +122,19 @@ class CsmarColumnInfo(Serializable):
             'column_name': self.column_name,
             'full_name': self.full_name,
             'explanation': self.explanation,
-            'enabled': ''
+            'enabled': Notation.serialize(self.enabled)
         }
 
     def reconcile(self) -> T:
         pass
 
     @staticmethod
-    def deserialize(data: dict) -> T:
+    def deserialize(data: dict) -> 'CsmarColumnInfo':
         column_name: str = data['column_name']
         full_name: str = data['full_name']
         explanation: str = data['explanation']
-        column_info = CsmarColumnInfo(column_name, full_name, explanation)
+        enabled: bool = Notation.deserialize(data['enabled'])
+        column_info = CsmarColumnInfo(column_name, full_name, explanation, enabled)
         return column_info
 
 
@@ -141,7 +164,7 @@ class CsmarData(Serializable):
         pass
 
     @staticmethod
-    def deserialize(data: dict) -> T:
+    def deserialize(data: dict) -> 'CsmarData':
         del data['head']
         del data['tail']
 
@@ -166,6 +189,8 @@ class CsmarDatasheet(Serializable):
                 raise ValueError(f"Datasheet file {datasheet_path} is not valid")
             self.data_name: str = ''
             self.column_infos: list[CsmarColumnInfo] = []
+            self.disabled: Optional[bool] = None
+
             self._load_data_name()
             self._load_column_infos()
 
@@ -178,7 +203,7 @@ class CsmarDatasheet(Serializable):
         return {
             'name': self.data_name,
             'path': str(self.datasheet_path.parent.absolute()),
-            'disabled': '',
+            'disabled': Notation.serialize(self.disabled),
             'columns': columns
         }
 
@@ -186,10 +211,11 @@ class CsmarDatasheet(Serializable):
         pass
 
     @staticmethod
-    def deserialize(data: dict) -> T:
+    def deserialize(data: dict) -> 'CsmarDatasheet':
         csmar_datasheet = CsmarDatasheet(manual=True)
         csmar_datasheet.datasheet_path = examine_csmar_dir(data['path']).datasheet
         csmar_datasheet.data_name = data['name']
+        csmar_datasheet.disabled = Notation.deserialize(data['disabled'])
 
         columns_data = data['columns']
         columns = [CsmarColumnInfo.deserialize(d) for d in columns_data]
