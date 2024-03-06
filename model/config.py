@@ -1,10 +1,21 @@
 import copy
 import datetime
+import shutil
+from itertools import chain
 
 import yaml
 from yaml import Loader
 
 from loader import *
+
+
+@dataclass
+class Default:
+    """
+    True means enabled, False means disabled
+    """
+    dataset: bool = True
+    column: bool = False
 
 
 @dataclass
@@ -64,14 +75,54 @@ def make_zipfile(output_path: Path, source_dir: Path, exclude_dirs: list[Path], 
 
 
 class DataConfig:
-    def __init__(self, layout: DataConfigLayout):
+    def __init__(self, layout: DataConfigLayout, default: Default = Default()):
         self.layout: DataConfigLayout = layout
+        self.default = default
 
         self.unconfigured: list[Path] = []
         self.configured: list[Path] = []
         self.ignored: list[Path] = []
 
+        self.original_csmar_datas: list[CsmarData] = []
+        self.derived_csmar_datas: list[CsmarData] = []
+
+    @property
+    def combined_configs(self) -> chain[Path]:
+        return chain(self.unconfigured, self.configured, self.ignored)
+
+    def auto_config(self, csmar_data_dir: PathLike | str):
+        """
+        Automatically make new config files, perform any necessary cleanup operations and finally load them
+        :return:
+        """
+        self.make_backup()
+
+        self.load_config()
+        self.original_csmar_datas = load_csmar_data(csmar_data_dir)
+
+        derived_datas_dict: dict[str, CsmarData] = {d.csmar_datasheet.data_name: d for d in self.derived_csmar_datas}
+        to_make: list[CsmarData] = []
+        for original_data in self.original_csmar_datas:
+            name = original_data.csmar_datasheet.data_name
+            if name in derived_datas_dict:
+                del derived_datas_dict[name]
+            else:
+                to_make.append(original_data)
+
+        self.make_config(to_make)
+
+        for lonely_data in derived_datas_dict.values():
+            os.remove(lonely_data.config_path)
+
+        self.load_config()
+        self.clean_config()
+
     def make_config(self, datas: list[CsmarData]):
+        """
+        make config files
+        :param datas:
+        :return:
+        """
         suffix = '.yaml'
         for data in datas:
             serialized_datasheet = data.serialize()
@@ -82,16 +133,55 @@ class DataConfig:
             print(f"Saved '{name}' to '{save_to}'")
 
     def clean_config(self):
-        pass
+        """
+        Put existing config files into correct directories
+        :return:
+        """
+        for data in self.derived_csmar_datas:
+            config_path = data.config_path
+            if self._is_dataset_ignored(data):
+                if config_path.parent != self.layout.ignored:
+                    shutil.move(config_path, self.layout.ignored)
+            elif self._is_dataset_configured(data):
+                if config_path.parent != self.layout.configured:
+                    shutil.move(config_path, self.layout.configured)
+            else:
+                if config_path.parent != self.layout.root:
+                    shutil.move(config_path, self.layout.root)
+
+    def _is_dataset_ignored(self, data: CsmarData) -> bool:
+        b = data.csmar_datasheet.disabled
+        if b is None:
+            return not self.default.dataset  # because we are testing if it is 'ignored'
+        else:
+            return b
+
+    @staticmethod
+    def _is_dataset_configured(data: CsmarData) -> bool:
+        if data.csmar_datasheet.disabled is not None:
+            return True
+        for column in data.csmar_datasheet.column_infos:
+            if column.enabled is not None:
+                return True
+        return False
 
     def load_config(self):
+        self.derived_csmar_datas = []
         self._find_config_files()
-        with open(self.configured[0], mode='r') as f:
-            y = yaml.load(f, Loader=Loader)
-            d = CsmarData.deserialize(y)
-            print(d)
+        for config in self.combined_configs:
+            with open(config, mode='r') as f:
+                y = yaml.load(f, Loader=Loader)
+                csmar_data = CsmarData.deserialize(y)
+                csmar_data.config_path = config
+                self.derived_csmar_datas.append(csmar_data)
+        print(f"Loaded {len(self.derived_csmar_datas)} config files:")
+        print('\n'.join([d.csmar_datasheet.data_name for d in self.derived_csmar_datas]))
 
     def _find_config_files(self):
+        self.configured = []
+        self.configured = []
+        self.ignored = []
+
         def raise_error(p):
             raise RuntimeError(f"Config dir damaged: do not expect {p}")
 
@@ -134,4 +224,4 @@ class DataConfig:
 if __name__ == '__main__':
     # make_layout(DataConfigLayout(Path('./config/data')))
     # csmar_datas = load_csmar_data(r'/Users/a/playground/freestyle/')
-    DataConfig(DataConfigLayout(Path('./config/data'))).load_config()
+    DataConfig(DataConfigLayout(Path('./config/data'))).auto_config(r'/Users/a/playground/freestyle/')

@@ -145,6 +145,8 @@ class CsmarData(Serializable):
             self.csmar_directory = csmar_directory
             self.csmar_datasheet = CsmarDatasheet(self.csmar_directory.datasheet)
 
+            self.config_path: Optional[Path] = None
+
     @staticmethod
     def struct() -> dict[str, None]:
         return {
