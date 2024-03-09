@@ -1,8 +1,11 @@
 import re
+from pathlib import Path
 from typing import Any, Mapping, Optional
 
 import numpy as np
 import pandas as pd
+
+from model.loader import CsmarData
 
 pd.options.mode.copy_on_write = True
 
@@ -63,11 +66,27 @@ class Preprocessor:
     def __init__(self, strategy: LoadingStrategy):
         self.strategy = strategy
 
+    @staticmethod
+    def expect_file(path: str):
+        path = Path(path)
+        if not path.is_file():
+            raise ValueError(f"\"{path}\" is not a valid file")
+
     def load_dataset(self, path: str) -> pd.DataFrame:
+        """
+        Transform a csv file into a pandas dataframe
+        :param path: A csv file path
+        :return: pandas dataframe
+        """
         df = pd.read_csv(path)
         return df
 
     def load_normalized_dataset(self, path: str) -> Optional[pd.DataFrame]:
+        """
+        Transform a csv file into a pandas dataframe and normalize it according to the strategy
+        :param path: A csv file path
+        :return: A normalized pandas dataframe; None if no data is left after filtering/normalization
+        """
         df = self.load_dataset(path)
         df = self.normalize_dataset(df)
         return df

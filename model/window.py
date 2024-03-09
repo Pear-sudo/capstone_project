@@ -81,6 +81,7 @@ class WindowGenerator:
 
     def import_data(self):
         if self.train_df is not None and self.val_df is not None and self.test_df is not None:
+            # when the data has been provided in the initializer
             pass
         else:
             if type(self.data) is str:
