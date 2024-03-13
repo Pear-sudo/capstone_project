@@ -1,10 +1,13 @@
 import re
+from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
 import numpy as np
 import pandas as pd
+from tabulate import tabulate
 
+from model.config import DataConfig, DataConfigLayout
 from model.loader import CsmarData
 
 pd.options.mode.copy_on_write = True
@@ -62,6 +65,10 @@ from stats
         pass
 
 
+class Translation(Enum):
+    DELTA = 'delta'
+
+
 class Preprocessor:
     def __init__(self, strategy: LoadingStrategy):
         self.strategy = strategy
@@ -72,7 +79,8 @@ class Preprocessor:
         if not path.is_file():
             raise ValueError(f"\"{path}\" is not a valid file")
 
-    def load_dataset(self, path: str) -> pd.DataFrame:
+    @staticmethod
+    def load_dataset(path: str) -> pd.DataFrame:
         """
         Transform a csv file into a pandas dataframe
         :param path: A csv file path
@@ -91,7 +99,35 @@ class Preprocessor:
         df = self.normalize_dataset(df)
         return df
 
-    def split_to_dataframes(self, df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \
+    def load_normalized_csmar_data(self, datas: list[CsmarData]) -> pd.DataFrame:
+        pass
+
+    @staticmethod
+    def summarize_csmar_data(datas: list[CsmarData]):
+        headers = ['Series Number', 'Acronym', 'Fullname', 'Tran', 'Descriptions']
+        count = 0
+        table_data = []
+        for data in datas:
+            data_sheet = data.csmar_datasheet
+            if data_sheet.disabled:
+                continue
+            for column_info in data_sheet.column_infos:
+                if not column_info.enabled:
+                    continue
+                number = count + 1  # begin with 1
+                count += 1
+
+                acronym = column_info.column_name
+                fullname = column_info.full_name
+                tran = Translation.DELTA.value
+                description = column_info.full_name + column_info.explanation
+
+                table_data.append([number, acronym, fullname, tran, description])
+        tab = tabulate(table_data, headers=headers)
+        print(tab)
+
+    @staticmethod
+    def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \
             -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         tolerance = 1e-6
         if not abs(sum(ratio) - 1) < tolerance:
@@ -203,3 +239,10 @@ class Preprocessor:
             raise ValueError(
                 f"Expected {self.strategy.expected_columns}, got {len(train.columns)} during post normalization")
         return train, val, test
+
+
+if __name__ == "__main__":
+    config = DataConfig(DataConfigLayout(Path('./config/data')))
+    config.auto_config(r'/Users/a/playground/freestyle/')
+    preprocessor = Preprocessor(StockLoadingStrategy())
+    preprocessor.summarize_csmar_data(config.derived_csmar_datas)
