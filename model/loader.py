@@ -11,6 +11,11 @@ import pandas as pd
 from typing_extensions import Iterable
 
 
+def print_if(condition: bool, message: str) -> None:
+    if condition:
+        print(message)
+
+
 def head(filename: Path, n=10) -> list[str]:
     with open(filename, 'r', encoding='utf-8') as file:
         lines = []
@@ -272,17 +277,15 @@ class CsmarDatasheet(Serializable):
                 self.column_infos.append(column_info)
 
 
-def unzip_all(zip_files: list[Path]) -> list[Path]:
+def unzip_all(zip_files: list[Path], silence: bool = False) -> list[Path]:
     non_zip_files = [str(file) for file in zip_files if not is_zipfile(file)]
     if non_zip_files:
         raise ValueError("Those files are not zip:\n {}".format('\n'.join(non_zip_files)))
 
     unzipped_to: list[Path] = []
     for zip_file in zip_files:
-        print('Unzipping "{}"'.format(zip_file.name))
-        path = unzip(zip_file)
+        path = unzip(zip_file, silence=silence)
         unzipped_to.append(path)
-        print('Unzipped "{}"'.format(zip_file.name))
 
     return unzipped_to
 
@@ -305,7 +308,7 @@ def filter_files(directory: PathLike | str, examiner: Callable[[str], bool]) -> 
     return target_paths
 
 
-def unzip(file: str | PathLike) -> Path:
+def unzip(file: str | PathLike, silence: bool = False) -> Path:
     zip_path = Path(file)
     if not zip_path.is_file():
         raise FileNotFoundError()
@@ -321,6 +324,8 @@ def unzip(file: str | PathLike) -> Path:
         if len(list(directory.iterdir())) == 0:
             pass
         elif examine_csmar_dir(directory):
+            # if already unzipped
+            print_if(not silence, f'Skipping {zip_path} as it has been unzipped')
             return directory
         else:
             raise RuntimeError(f'Target directory {directory} exists but its content is dubious')
@@ -329,8 +334,10 @@ def unzip(file: str | PathLike) -> Path:
     else:
         raise RuntimeError('Unexpected situation')
 
+    print_if(not silence, 'Unzipping "{}"'.format(zip_path.name))
     with zipfile.ZipFile(zip_path, mode='r') as zip_ref:
         zip_ref.extractall(directory)
+    print_if(not silence, 'Unzipped "{}"'.format(zip_path.name))
 
     return directory
 
