@@ -325,10 +325,10 @@ def unzip(file: str | PathLike, silence: bool = False) -> Path:
             pass
         elif examine_csmar_dir(directory):
             # if already unzipped
-            print_if(not silence, f'Skipping {zip_path} as it has been unzipped')
+            print_if(not silence, f'Skipping "{zip_path}" as it has been unzipped')
             return directory
         else:
-            raise RuntimeError(f'Target directory {directory} exists but its content is dubious')
+            raise RuntimeError(f'Target directory "{directory}" exists but its content is dubious')
     elif not directory.exists():
         directory.mkdir(parents=False, exist_ok=False)
     else:
