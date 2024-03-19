@@ -193,7 +193,7 @@ class DataConfig:
 
     def _find_config_files(self):
         self.configured = []
-        self.configured = []
+        self.unconfigured = []
         self.ignored = []
 
         def raise_error(p):
