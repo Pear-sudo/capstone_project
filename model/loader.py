@@ -1,7 +1,9 @@
 import os
 import re
+import sys
 import zipfile
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -423,9 +425,42 @@ def examine_csmar_dir(directory: PathLike | str) -> CsmarDirectory | None:
 def load_csmar_data(directory: PathLike | str) -> list[CsmarData]:
     zip_files = filter_zip_files(directory)
     data_dirs: Iterable[CsmarDirectory] = map(examine_csmar_dir, unzip_all(zip_files))
-    csmar_data: list[CsmarData] = list(map(CsmarData, data_dirs))
-    print(f"Found {len(csmar_data)} csmar data directories")
-    return csmar_data
+    csmar_datas: list[CsmarData] = list(map(CsmarData, data_dirs))
+    csmar_datas = examine_csmar_datas(csmar_datas, auto_correct=True)
+    print(f"Found {len(csmar_datas)} csmar data directories")
+    return csmar_datas
+
+
+def examine_zip_files(files: list[Path]):
+    name_set = set(file.stem for file in files)
+    if len(name_set) < len(files):
+        raise RuntimeError(f'Found {len(files) - len(name_set)} duplicate zip files')
+
+
+def examine_csmar_datas(datas: list[CsmarData], auto_correct: bool = False) -> list[CsmarData]:
+    data_name_set = set(data.csmar_datasheet.data_name for data in datas)
+    discrepancy = len(datas) - len(data_name_set)
+    if discrepancy != 0:
+        count = Counter(data.csmar_datasheet.data_name for data in datas)
+        erratic_data_names = {k for k, v in count.items() if v > 1}
+        erratic_data: dict[str, list[CsmarData]] = {}
+        for data in datas:
+            name = data.csmar_datasheet.data_name
+            if name in erratic_data_names:
+                erratic_data.setdefault(name, []).append(data)
+
+        for k, v in erratic_data.items():
+            print(f"The following data shares a same name ('{k}'):\n")
+            for data in v:
+                print(f'\t{data.csmar_directory.csmar_dir}')
+            print()
+        sys.stdout.flush()
+        if not auto_correct:
+            # TODO handle it properly rather than simply drop the data
+            raise RuntimeError(f'Csmar data names do not match, {len(data_name_set)} unique, {len(datas)} in list')
+        else:
+            return [data for data in datas if data.csmar_datasheet.data_name not in erratic_data_names]
+    return datas
 
 
 if __name__ == '__main__':
