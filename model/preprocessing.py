@@ -117,6 +117,7 @@ class Preprocessor:
         return df
 
     def load_normalized_csmar_data(self, datas: list[CsmarData]) -> pd.DataFrame:
+        combined = pd.DataFrame()
         for data in datas:
             csmar_directory = data.csmar_directory
             data_path = csmar_directory.data
@@ -174,7 +175,9 @@ class Preprocessor:
             for info in ordinary_columns:
                 df = self.execute_instruction(df, info)
 
+            combined = self.combine_dataframes(combined, df)
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
+        logger.info("Loading finished.")
 
     @staticmethod
     def split_instructions(ins: str) -> list[str]:
