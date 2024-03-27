@@ -118,6 +118,7 @@ class Preprocessor:
             data_path = csmar_directory.data
             data_sheet = data.csmar_datasheet
 
+            # skip disabled data
             if data_sheet.disabled:
                 continue
 
@@ -125,7 +126,40 @@ class Preprocessor:
             if len(enabled_columns) == 0:
                 continue
 
+            # guess the time index
+            granularity_dic = {
+                'year': ['Sgnyea'],
+                'day': ['Trddt']
+            }
+            detected_granularity = {}
+            all_column_names = [info.column_name for info in data.csmar_datasheet.column_infos]
+            for name in all_column_names:
+                for granularity, keywords in granularity_dic.items():
+                    if name in keywords:
+                        detected_granularity.setdefault(granularity, []).append(name)
+            granularity_len = len(detected_granularity)
+
+            # error checking
+            if granularity_len == 0:
+                raise RuntimeError('Cannot detect any time granularity')
+            elif granularity_len == 1:
+                granularity_cols = list(detected_granularity.values())[0]
+                if len(detected_granularity) == 1:
+                    pass
+                elif len(detected_granularity) > 1:
+                    raise RuntimeError(f'Detected more than 1 column in current granularity {detected_granularity}')
+                else:
+                    raise RuntimeError('Unknown condition')
+            elif granularity_len > 1:
+                raise RuntimeError(f'Detected more than one time granularity: {detected_granularity}')
+            else:
+                raise RuntimeError('Unknown condition')
+
+            # load the dataframe
             enabled_column_names: list[str] = [info.column_name for info in enabled_columns]
+            granularity_col_name: str = list(detected_granularity.values())[0][0]
+            if granularity_col_name not in enabled_column_names:
+                enabled_column_names.append(granularity_col_name)
             df: DataFrame | None = None
             with open(data_path, 'r') as f:
                 # ensure column len match
@@ -140,15 +174,51 @@ class Preprocessor:
             if df is None:
                 logger.warning(f'Skipping {data_path} because pd loaded without data')
                 continue
+
             # filter the data:
             columns_to_filter = [info for info in enabled_columns if info.filter.strip() != '']
             for info in columns_to_filter:
-                # split the filter
+                # split the filter's instructions
                 fs: list[str] = [f.strip() for f in info.filter.strip().split(',')]
+                # todo this is not safe, add checking
                 fs_series = pd.Series(fs).astype(int)
                 df = df[df[info.column_name].isin(fs_series)]
 
+            # transform the data
+            for info in enabled_columns:
+
+                if info.instruction.strip() == '':
+                    # perform default transform
+                    continue
+
+                # split the instruction's instructions
+                instructions: list[str] = [i.strip() for i in info.instruction.strip().split(',')]
+                for i in instructions:
+                    match i:
+                        case 's':
+                            # split into columns
+                            unique = df[info.column_name].unique()
+                            new_df = pd.DataFrame()
+                            for col in unique:
+                                partition = df[df[info.column_name] == col].copy()
+                                partition = partition.drop(columns=[info.column_name])
+                                partition.columns = [f"{name}_{col}" for name in partition.columns]
+                                new_df = self.combine_dataframes(new_df, partition)
+                            df = new_df
+                        case _:
+                            raise RuntimeError(f"Invalid instruction: {i}")
+
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
+
+    @staticmethod
+    def combine_dataframes(origin: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+        """
+        Combines two dataframes, respecting the time.
+        :param origin:
+        :param new:
+        :return:
+        """
+        pass
 
     @staticmethod
     def summarize_csmar_data(datas: list[CsmarData]):
