@@ -10,7 +10,7 @@ from pandas import DataFrame
 from tabulate import tabulate
 
 from model.config import DataConfig, DataConfigLayout
-from model.loader import CsmarData
+from model.loader import CsmarData, CsmarColumnInfo
 
 pd.options.mode.copy_on_write = True
 
@@ -161,31 +161,47 @@ class Preprocessor:
                 df = df[df[info.column_name].isin(fs_series)]
 
             # transform the data
-            for info in enabled_columns:
+            special_columns = []
+            ordinary_columns = []
+            for c in enabled_columns:
+                if 's' in self.split_instructions(c.instruction):
+                    special_columns.append(c)
+                else:
+                    ordinary_columns.append(c)
 
-                if info.instruction.strip() == '':
-                    # perform default transform
-                    continue
-
-                # split the instruction's instructions
-                instructions: list[str] = [i.strip() for i in info.instruction.strip().split(',')]
-                # todo the order of instructions matters, check it!
-                for i in instructions:
-                    match i:
-                        case 's':
-                            # split into columns
-                            unique = df[info.column_name].unique()
-                            new_df = pd.DataFrame()
-                            for col in unique:
-                                partition = df[df[info.column_name] == col].copy()
-                                partition = partition.drop(columns=[info.column_name])
-                                partition.columns = [f"{name}_{col}" for name in partition.columns]
-                                new_df = self.combine_dataframes(new_df, partition)
-                            df = new_df
-                        case _:
-                            raise RuntimeError(f"Invalid instruction: {i}")
+            for info in special_columns:
+                df = self.execute_instruction(df, info)
+            for info in ordinary_columns:
+                df = self.execute_instruction(df, info)
 
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
+
+    @staticmethod
+    def split_instructions(ins: str) -> list[str]:
+        return [ins.strip() for ins in ins.strip().split(',')]
+
+    def execute_instruction(self, df: pd.DataFrame, info: CsmarColumnInfo) -> pd.DataFrame:
+        if info.instruction.strip() == '':
+            # perform default transform
+            self.auto_transform_column(df, info.column_name)
+            return df
+
+        instructions: list[str] = self.split_instructions(info.instruction)
+        for i in instructions:
+            match i:
+                case 's':
+                    # split into columns
+                    unique = df[info.column_name].unique()
+                    new_df = pd.DataFrame()
+                    for col in unique:
+                        partition = df[df[info.column_name] == col].copy()
+                        partition = partition.drop(columns=[info.column_name])
+                        partition.columns = [f"{name}_{col}" for name in partition.columns]
+                        new_df = self.combine_dataframes(new_df, partition)
+                    df = new_df
+                case _:
+                    raise RuntimeError(f"Invalid instruction: {i}")
+        return df
 
     def detect_granularity(self, column_names: list[str], strict: bool = True, granularity_dic=None) -> tuple[str, str]:
         if granularity_dic is None:
@@ -300,6 +316,15 @@ class Preprocessor:
             raise RuntimeError('Dataset is empty for unknown reasons.')
 
         return train_df, val_df, test_df
+
+    def auto_transform_column(self, df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+        pass
+
+    def delta(self, df: pd.DataFrame) -> pd.DataFrame:
+        pass
+
+    def ln(self, df: pd.DataFrame) -> pd.DataFrame:
+        pass
 
     def normalize_date(self, df: pd.DataFrame, date_column: str) -> pd.DataFrame:
         sample = df[date_column].iloc[0]
