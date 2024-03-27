@@ -116,6 +116,21 @@ class Preprocessor:
         df = self.normalize_dataset(df)
         return df
 
+    def load_partial_df(self, path: Path, enabled_column_names: list[str], all_column_names: list[str]) -> pd.DataFrame:
+        granularity_col_name: str = self.detect_granularity(all_column_names)[1]
+        if granularity_col_name not in enabled_column_names:
+            enabled_column_names.append(granularity_col_name)
+        df: DataFrame | None = None
+        with open(path, 'r') as f:
+            # ensure column len match
+            df = pd.read_csv(f, usecols=enabled_column_names)
+            if len(df.columns) != len(enabled_column_names):
+                raise RuntimeError(f"Number of columns do not match: "
+                                   f"expected {len(enabled_column_names)}, "
+                                   f"loaded {len(df.columns)}")
+            logger.debug(f"Read {len(df.columns)} columns from {path}:\n{df.columns}")
+        return df
+
     def load_normalized_csmar_data(self, datas: list[CsmarData]) -> pd.DataFrame:
         combined = pd.DataFrame()
         for data in datas:
@@ -133,19 +148,10 @@ class Preprocessor:
 
             # load the dataframe
             enabled_column_names: list[str] = [info.column_name for info in enabled_columns]
-            all_column_names = [info.column_name for info in data_sheet.column_infos]
-            granularity_col_name: str = self.detect_granularity(all_column_names)[1]
-            if granularity_col_name not in enabled_column_names:
-                enabled_column_names.append(granularity_col_name)
-            df: DataFrame | None = None
-            with open(data_path, 'r') as f:
-                # ensure column len match
-                df = pd.read_csv(f, usecols=enabled_column_names)
-                if len(df.columns) != len(enabled_column_names):
-                    raise RuntimeError(f"Number of columns do not match: "
-                                       f"expected {len(enabled_column_names)}, "
-                                       f"loaded {len(df.columns)}")
-                logger.debug(f"Read {len(df.columns)} columns from {data_path}:\n{df.columns}")
+            all_column_names: list[str] = [info.column_name for info in data_sheet.column_infos]
+            df = self.load_partial_df(path=data_path,
+                                      enabled_column_names=enabled_column_names,
+                                      all_column_names=all_column_names)
 
             # null safety check
             if df is None:
