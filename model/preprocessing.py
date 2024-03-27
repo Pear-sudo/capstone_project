@@ -126,13 +126,28 @@ class Preprocessor:
                 continue
 
             enabled_column_names: list[str] = [info.column_name for info in enabled_columns]
+            df: DataFrame | None = None
             with open(data_path, 'r') as f:
-                df: DataFrame = pd.read_csv(f, usecols=enabled_column_names)
+                # ensure column len match
+                df = pd.read_csv(f, usecols=enabled_column_names)
                 if len(df.columns) != len(enabled_column_names):
                     raise RuntimeError(f"Number of columns do not match: "
                                        f"expected {len(enabled_column_names)}, "
                                        f"loaded {len(df.columns)}")
                 logger.debug(f"Read {len(df.columns)} columns from {data_path}:\n{df.columns}")
+
+            # null safety check
+            if df is None:
+                logger.warning(f'Skipping {data_path} because pd loaded without data')
+                continue
+            # filter the data:
+            columns_to_filter = [info for info in enabled_columns if info.filter.strip() != '']
+            for info in columns_to_filter:
+                # split the filter
+                fs: list[str] = [f.strip() for f in info.filter.strip().split(',')]
+                fs_series = pd.Series(fs).astype(int)
+                df = df[df[info.column_name].isin(fs_series)]
+
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
 
     @staticmethod
