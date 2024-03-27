@@ -1,3 +1,4 @@
+import logging
 import re
 from enum import Enum
 from pathlib import Path
@@ -5,12 +6,24 @@ from typing import Any, Mapping, Optional
 
 import numpy as np
 import pandas as pd
+from pandas import DataFrame
 from tabulate import tabulate
 
 from model.config import DataConfig, DataConfigLayout
 from model.loader import CsmarData
 
 pd.options.mode.copy_on_write = True
+
+logger = logging.getLogger(Path(__file__).name)
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
 
 
 class LoadingStrategy:
@@ -100,7 +113,27 @@ class Preprocessor:
         return df
 
     def load_normalized_csmar_data(self, datas: list[CsmarData]) -> pd.DataFrame:
-        pass
+        for data in datas:
+            csmar_directory = data.csmar_directory
+            data_path = csmar_directory.data
+            data_sheet = data.csmar_datasheet
+
+            if data_sheet.disabled:
+                continue
+
+            enabled_columns = [c for c in data_sheet.column_infos if c.enabled]
+            if len(enabled_columns) == 0:
+                continue
+
+            enabled_column_names: list[str] = [info.column_name for info in enabled_columns]
+            with open(data_path, 'r') as f:
+                df: DataFrame = pd.read_csv(f, usecols=enabled_column_names)
+                if len(df.columns) != len(enabled_column_names):
+                    raise RuntimeError(f"Number of columns do not match: "
+                                       f"expected {len(enabled_column_names)}, "
+                                       f"loaded {len(df.columns)}")
+                logger.debug(f"Read {len(df.columns)} columns from {data_path}:\n{df.columns}")
+            logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
 
     @staticmethod
     def summarize_csmar_data(datas: list[CsmarData]):
@@ -245,4 +278,4 @@ if __name__ == "__main__":
     config = DataConfig(DataConfigLayout(Path('./config/data')))
     config.auto_config(r'/Users/a/playground/freestyle/')
     preprocessor = Preprocessor(StockLoadingStrategy())
-    preprocessor.summarize_csmar_data(config.derived_csmar_datas)
+    preprocessor.load_normalized_csmar_data(config.derived_csmar_datas)
