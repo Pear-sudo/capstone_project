@@ -85,6 +85,10 @@ class Translation(Enum):
 class Preprocessor:
     def __init__(self, strategy: LoadingStrategy):
         self.strategy = strategy
+        self.granularity_dic = {
+            'year': ['Sgnyea'],
+            'day': ['Trddt']
+        }
 
     @staticmethod
     def expect_file(path: str):
@@ -126,38 +130,10 @@ class Preprocessor:
             if len(enabled_columns) == 0:
                 continue
 
-            # guess the time index
-            granularity_dic = {
-                'year': ['Sgnyea'],
-                'day': ['Trddt']
-            }
-            detected_granularity = {}
-            all_column_names = [info.column_name for info in data.csmar_datasheet.column_infos]
-            for name in all_column_names:
-                for granularity, keywords in granularity_dic.items():
-                    if name in keywords:
-                        detected_granularity.setdefault(granularity, []).append(name)
-            granularity_len = len(detected_granularity)
-
-            # error checking
-            if granularity_len == 0:
-                raise RuntimeError('Cannot detect any time granularity')
-            elif granularity_len == 1:
-                granularity_cols = list(detected_granularity.values())[0]
-                if len(detected_granularity) == 1:
-                    pass
-                elif len(detected_granularity) > 1:
-                    raise RuntimeError(f'Detected more than 1 column in current granularity {detected_granularity}')
-                else:
-                    raise RuntimeError('Unknown condition')
-            elif granularity_len > 1:
-                raise RuntimeError(f'Detected more than one time granularity: {detected_granularity}')
-            else:
-                raise RuntimeError('Unknown condition')
-
             # load the dataframe
             enabled_column_names: list[str] = [info.column_name for info in enabled_columns]
-            granularity_col_name: str = list(detected_granularity.values())[0][0]
+            all_column_names = [info.column_name for info in data_sheet.column_infos]
+            granularity_col_name: str = self.detect_granularity(all_column_names)[1]
             if granularity_col_name not in enabled_column_names:
                 enabled_column_names.append(granularity_col_name)
             df: DataFrame | None = None
@@ -193,6 +169,7 @@ class Preprocessor:
 
                 # split the instruction's instructions
                 instructions: list[str] = [i.strip() for i in info.instruction.strip().split(',')]
+                # todo the order of instructions matters, check it!
                 for i in instructions:
                     match i:
                         case 's':
@@ -210,15 +187,75 @@ class Preprocessor:
 
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
 
-    @staticmethod
-    def combine_dataframes(origin: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    def detect_granularity(self, column_names: list[str], strict: bool = True, granularity_dic=None) -> tuple[str, str]:
+        if granularity_dic is None:
+            granularity_dic = self.granularity_dic
+        detected_granularity = {}
+
+        for name in column_names:
+            for granularity, keywords in granularity_dic.items():
+                if strict:
+                    if name in keywords:
+                        detected_granularity.setdefault(granularity, []).append(name)
+                else:
+                    for k in keywords:
+                        if name.find(k) != -1:
+                            detected_granularity.setdefault(granularity, []).append(name)
+
+        granularity_len = len(detected_granularity)
+
+        # error checking
+        if granularity_len == 0:
+            raise RuntimeError('Cannot detect any time granularity')
+        elif granularity_len == 1:
+            granularity_cols = list(detected_granularity.values())[0]
+            if len(detected_granularity) == 1:
+                pass
+            elif len(detected_granularity) > 1:
+                raise RuntimeError(f'Detected more than 1 column in current granularity {detected_granularity}')
+            else:
+                raise RuntimeError('Unknown condition')
+        elif granularity_len > 1:
+            raise RuntimeError(f'Detected more than one time granularity: {detected_granularity}')
+        else:
+            raise RuntimeError('Unknown condition')
+
+        col_name = list(detected_granularity.values())[0][0]
+        granularity = list(detected_granularity.keys())[0]
+
+        return granularity, col_name
+
+    def combine_dataframes(self,
+                           origin: pd.DataFrame,
+                           new: pd.DataFrame,
+                           origin_dc: str | None = None,
+                           new_dc: str | None = None) -> pd.DataFrame:
         """
         Combines two dataframes, respecting the time.
+        :param new_dc: date column
+        :param origin_dc: date column
         :param origin:
         :param new:
         :return:
         """
-        pass
+        if len(origin.columns) == 0:
+            return new
+
+        if origin_dc is not None and origin_dc not in origin.columns:
+            raise ValueError(f"'{origin_dc}' not found in '{origin.columns}'")
+        if new_dc is not None and new_dc not in new.columns:
+            raise ValueError(f"'{new_dc}' not found in '{new.columns}'")
+
+        if origin_dc is None:
+            origin_dc = self.detect_granularity(origin.columns, strict=False)[1]
+        if new_dc is None:
+            new_dc = self.detect_granularity(new.columns, strict=False)[1]
+
+        combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
+
+        combined.drop(columns=[new_dc], inplace=True)
+
+        return combined
 
     @staticmethod
     def summarize_csmar_data(datas: list[CsmarData]):
