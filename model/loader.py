@@ -119,6 +119,8 @@ class CsmarColumnInfo(Serializable):
     full_name: str
     explanation: str
     enabled: bool = None
+    filter: str = ''
+    instruction: str = ''
 
     @staticmethod
     def struct() -> dict[str, None]:
@@ -129,7 +131,9 @@ class CsmarColumnInfo(Serializable):
             'column_name': self.column_name,
             'full_name': self.full_name,
             'explanation': self.explanation,
-            'enabled': Notation.serialize(self.enabled)
+            'enabled': Notation.serialize(self.enabled),
+            'filter': self.filter,
+            'instruction': self.instruction
         }
 
     def reconcile(self) -> T:
@@ -142,6 +146,8 @@ class CsmarColumnInfo(Serializable):
         explanation: str = data['explanation']
         enabled: bool = Notation.deserialize(data['enabled'])
         column_info = CsmarColumnInfo(column_name, full_name, explanation, enabled)
+        column_info.filter = data['filter']
+        column_info.instruction = data['instruction']
         return column_info
 
 
