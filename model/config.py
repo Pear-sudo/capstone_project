@@ -65,12 +65,11 @@ def latest_file(paths: Iterable[Path]) -> Path:
 
 
 def hash_file(filename):
-    """Generate SHA-256 hash of a file."""
-    sha256_hash = hashlib.sha256()
+    sha1_hash = hashlib.sha1()
     with open(filename, 'rb') as f:
         for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+            sha1_hash.update(byte_block)
+    return sha1_hash.hexdigest()
 
 
 def make_zipfile(output_path: Path, source_dir: Path, exclude_dirs: list[Path], ignore_system_files=True):
@@ -230,16 +229,16 @@ class DataConfig:
                 raise RuntimeError(f"Config dir damaged: do not found {path}")
 
     def make_backup(self):
-        # last_backup = latest_file(self.layout.backup.iterdir())
-        # old_hash = hash_file(last_backup)
+        last_backup = latest_file(self.layout.backup.iterdir())
+        old_hash = hash_file(last_backup)
 
         output_path = self.layout.backup.joinpath(make_timestamp() + '.zip')
         exclude = [self.layout.backup]
         make_zipfile(output_path, self.layout.root, exclude)
-        #
-        # new_hash = hash_file(output_path)
-        # if new_hash == old_hash:
-        #     os.remove(output_path)
+
+        new_hash = hash_file(output_path)
+        if new_hash == old_hash:
+            os.remove(output_path)
 
 
 if __name__ == '__main__':
