@@ -168,18 +168,7 @@ class Preprocessor:
                 df = df[df[info.column_name].isin(fs_series)]
 
             # transform the data
-            special_columns = []
-            ordinary_columns = []
-            for c in enabled_columns:
-                if 's' in self.split_instructions(c.instruction):
-                    special_columns.append(c)
-                else:
-                    ordinary_columns.append(c)
-
-            for info in special_columns:
-                df = self.execute_instruction(df, info)
-            for info in ordinary_columns:
-                df = self.execute_instruction(df, info)
+            df = self.execute_instruction(df, enabled_columns)
 
             combined = self.combine_dataframes(combined, df)
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
@@ -190,27 +179,48 @@ class Preprocessor:
     def split_instructions(ins: str) -> list[str]:
         return [ins.strip() for ins in ins.strip().split(',')]
 
-    def execute_instruction(self, df: pd.DataFrame, info: CsmarColumnInfo) -> pd.DataFrame:
-        if info.instruction.strip() == '':
-            # perform default transform
-            self.auto_transform_column(df, info.column_name)
-            return df
+    def execute_instruction(self, df: pd.DataFrame, column_infos: list[CsmarColumnInfo]) -> pd.DataFrame:
+        special_columns = []
+        ordinary_columns = []
+        for c in column_infos:
+            if 's' in self.split_instructions(c.instruction):
+                special_columns.append(c)
+            else:
+                ordinary_columns.append(c)
 
-        instructions: list[str] = self.split_instructions(info.instruction)
-        for i in instructions:
-            match i:
-                case 's':
-                    # split into columns
-                    unique = df[info.column_name].unique()
-                    new_df = pd.DataFrame()
-                    for col in unique:
-                        partition = df[df[info.column_name] == col].copy()
-                        partition = partition.drop(columns=[info.column_name])
-                        partition.columns = [f"{name}_{col}" for name in partition.columns]
-                        new_df = self.combine_dataframes(new_df, partition)
-                    df = new_df
-                case _:
-                    raise RuntimeError(f"Invalid instruction: {i}")
+        suffixes: list[str] = []
+        for info in special_columns:
+            instructions: list[str] = self.split_instructions(info.instruction)
+            for i in instructions:
+                match i:
+                    case 's':
+                        # split into columns
+                        suffixes = df[info.column_name].unique()
+                        new_df = pd.DataFrame()
+                        for suffix in suffixes:
+                            partition = df[df[info.column_name] == suffix].copy()
+                            partition = partition.drop(columns=[info.column_name])
+                            partition.columns = [f"{name}_{suffix}" for name in partition.columns]
+                            new_df = self.combine_dataframes(new_df, partition)
+                        df = new_df
+                    case _:
+                        raise RuntimeError(f"Invalid instruction: {i}")
+
+        for info in ordinary_columns:
+            # first check if the name is changed due to split (s) operation, if so, correct it
+            original_column_name = info.column_name
+            column_names = []
+            if len(suffixes) > 0:
+                for suffix in suffixes:
+                    column_names.append(f"{original_column_name}_{suffix}")
+            else:
+                column_names.append(original_column_name)
+
+            for column_name in column_names:
+                if info.instruction.strip() == '':
+                    # perform default transform
+                    df = self.auto_transform_column(df, column_name)
+
         return df
 
     def detect_granularity(self, column_names: list[str], strict: bool = True, granularity_dic=None) -> tuple[str, str]:
