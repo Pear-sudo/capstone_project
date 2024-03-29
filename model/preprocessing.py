@@ -348,6 +348,7 @@ class Preprocessor:
 
     def auto_transform_column(self, df: pd.DataFrame, column_name: str) -> pd.DataFrame:
         df[column_name] = self.delta(df[column_name])
+        # I am wondering if it is better to handle NaN in the final combined df rather than at here
         return df
 
     @staticmethod
@@ -393,6 +394,10 @@ class Preprocessor:
         """
         df.dropna(axis=1, how="all", inplace=True)  # first deal columns
         df.dropna(axis=0, how="any", inplace=True)  # then rows
+
+    @staticmethod
+    def fill_nan(df: pd.DataFrame) -> pd.DataFrame:
+        pass
 
     @staticmethod
     def normalize_values(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) \

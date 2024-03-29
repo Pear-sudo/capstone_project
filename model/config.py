@@ -127,6 +127,8 @@ class DataConfig:
         for lonely_data in derived_datas_dict.values():
             os.remove(lonely_data.config_path)
 
+        self.update_config()
+
         self.load_config()
         self.clean_config()
 
@@ -144,6 +146,17 @@ class DataConfig:
             with open(save_to, 'w') as f:
                 yaml.dump(serialized_datasheet, f, sort_keys=False)
             print(f"Saved '{name}' to '{save_to}'")
+
+    def update_config(self):
+        """
+        in case the overall structure of the config is changed
+        :return:
+        """
+        for data in self.derived_csmar_datas:
+            if data.is_structure_updated:
+                with open(data.config_path, 'w') as f:
+                    yaml.dump(data.serialize(), f, sort_keys=False)
+                print(f"Updated '{data} to {data.config_path}'")
 
     def clean_config(self):
         """

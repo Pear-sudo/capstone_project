@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import sys
@@ -129,9 +130,9 @@ class CsmarColumnInfo(Serializable):
     def serialize(self) -> dict:
         return {
             'column_name': self.column_name,
+            'enabled': Notation.serialize(self.enabled),
             'full_name': self.full_name,
             'explanation': self.explanation,
-            'enabled': Notation.serialize(self.enabled),
             'filter': self.filter,
             'instruction': self.instruction
         }
@@ -160,6 +161,8 @@ class CsmarData(Serializable):
 
             self.config_path: Optional[Path] = None
 
+            self.is_structure_updated: bool = False
+
     @staticmethod
     def struct() -> dict[str, None]:
         return {
@@ -175,13 +178,21 @@ class CsmarData(Serializable):
             'tail': remove_all_quotes(tail(self.csmar_directory.data))
         }
 
+    def core_serialize(self) -> dict:
+        """
+        Do not read additional data from the disk.
+        :return:
+        """
+        return {
+            **self.csmar_datasheet.serialize(),
+        }
+
     def reconcile(self) -> T:
         pass
 
     @staticmethod
     def deserialize(data: dict) -> 'CsmarData':
-        del data['head']
-        del data['tail']
+        data = CsmarData.remove_irrelevant_data(data)
 
         csmar_directory_path = data['path']
         csmar_directory = examine_csmar_dir(csmar_directory_path)
@@ -192,7 +203,16 @@ class CsmarData(Serializable):
 
         csmar_data.csmar_datasheet = csmar_datasheet
 
+        new_data = csmar_data.core_serialize()
+        csmar_data.is_structure_updated = json.dumps(new_data) != json.dumps(data)
+
         return csmar_data
+
+    @staticmethod
+    def remove_irrelevant_data(data: dict) -> dict:
+        del data['head']
+        del data['tail']
+        return data
 
 
 class CsmarDatasheet(Serializable):
