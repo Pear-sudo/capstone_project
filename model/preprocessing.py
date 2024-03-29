@@ -337,10 +337,12 @@ class Preprocessor:
         return train_df, val_df, test_df
 
     def auto_transform_column(self, df: pd.DataFrame, column_name: str) -> pd.DataFrame:
-        pass
+        df[column_name] = self.delta(df[column_name])
+        return df
 
-    def delta(self, df: pd.DataFrame) -> pd.DataFrame:
-        pass
+    @staticmethod
+    def delta(df: pd.DataFrame) -> pd.DataFrame:
+        return df.diff()
 
     def ln(self, df: pd.DataFrame) -> pd.DataFrame:
         pass
