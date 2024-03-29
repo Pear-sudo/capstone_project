@@ -184,6 +184,7 @@ class Preprocessor:
             combined = self.combine_dataframes(combined, df)
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
         logger.info("Loading finished.")
+        return combined
 
     @staticmethod
     def split_instructions(ins: str) -> list[str]:
@@ -254,9 +255,11 @@ class Preprocessor:
                            origin: pd.DataFrame,
                            new: pd.DataFrame,
                            origin_dc: str | None = None,
-                           new_dc: str | None = None) -> pd.DataFrame:
+                           new_dc: str | None = None,
+                           date_column_name: str | None = 'Date') -> pd.DataFrame:
         """
         Combines two dataframes, respecting the time.
+        :param date_column_name:
         :param new_dc: date column
         :param origin_dc: date column
         :param origin:
@@ -271,6 +274,10 @@ class Preprocessor:
         if new_dc is not None and new_dc not in new.columns:
             raise ValueError(f"'{new_dc}' not found in '{new.columns}'")
 
+        if date_column_name is not None and origin_dc is None:
+            if date_column_name in origin.columns:
+                origin_dc = date_column_name
+
         if origin_dc is None:
             origin_dc = self.detect_granularity(origin.columns, strict=False)[1]
         if new_dc is None:
@@ -279,6 +286,9 @@ class Preprocessor:
         combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
 
         combined.drop(columns=[new_dc], inplace=True)
+
+        if date_column_name and date_column_name not in combined.columns:
+            combined.rename(columns={origin_dc: date_column_name}, inplace=True)
 
         return combined
 
@@ -360,7 +370,8 @@ class Preprocessor:
         df.drop(date_column, axis=1, inplace=True)
         return df
 
-    def normalize_nan(self, df: pd.DataFrame):
+    @staticmethod
+    def normalize_nan(df: pd.DataFrame):
         """
         Delete the columns whose values are all nan (not a number).
         :param df:
@@ -369,7 +380,8 @@ class Preprocessor:
         df.dropna(axis=1, how="all", inplace=True)  # first deal columns
         df.dropna(axis=0, how="any", inplace=True)  # then rows
 
-    def normalize_values(self, train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) \
+    @staticmethod
+    def normalize_values(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) \
             -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         # todo this is not correct: you should use moving averages
         """
