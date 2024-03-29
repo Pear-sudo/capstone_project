@@ -383,9 +383,11 @@ class Preprocessor:
         return df
 
     @staticmethod
-    def normalize_nan(df: pd.DataFrame):
+    def drop_nan(df: pd.DataFrame):
         """
-        Delete the columns whose values are all nan (not a number).
+        Delete:
+        1. The columns whose values are all NaN
+        2. The rows that contain any NaN
         :param df:
         :return:
         """
@@ -410,7 +412,8 @@ class Preprocessor:
 
         return train, val, test
 
-    def is_valid_date(self, s: str) -> bool:
+    @staticmethod
+    def is_valid_date(s: str) -> bool:
         return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
     def normalize_dataset(self, df: pd.DataFrame) -> Optional[
@@ -444,9 +447,9 @@ class Preprocessor:
         train, val, test = self.normalize_values(train, val, test)
 
         # nan guard
-        self.normalize_nan(train)
-        self.normalize_nan(val)
-        self.normalize_nan(test)
+        self.drop_nan(train)
+        self.drop_nan(val)
+        self.drop_nan(test)
 
         if len(train.columns) != self.strategy.expected_columns and self.strategy.expected_columns is not None:
             raise ValueError(
