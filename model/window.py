@@ -100,6 +100,10 @@ class WindowGenerator:
                 raise ValueError('Neither dfs nor data is valid.')
 
     def import_from_dataframe(self):
+        """
+        Use the provided dataframe directly.
+        :return:
+        """
         self.train_df, self.val_df, self.test_df = self.preprocessor.split_to_dataframes(self.data)
 
         # security check
@@ -110,12 +114,20 @@ class WindowGenerator:
                                                                                         self.val_df, self.test_df, )
 
     def import_from_file(self):
+        """
+        Use the provided file directly.
+        :return:
+        """
         self.data = self.preprocessor.load_normalized_dataset(self.data)
         if self.data is None:
             raise ValueError(f'No data is left after filtering {self.path}')
         self.import_from_dataframe()
 
     def import_from_directory(self):
+        """
+        Use the data contained in the provided directory directly.
+        :return:
+        """
         files = os.listdir(self.data)
         datasets = [self.preprocessor.load_normalized_dataset(os.path.join(self.data, file)) for file in files]
         datasets = [dataset for dataset in datasets if dataset is not None]
@@ -131,6 +143,13 @@ class WindowGenerator:
         self.check_features(features)  # this often goes wrong
         # the memory consumption at this point is about 559M
         self.train_dfs, self.val_dfs, self.test_dfs = zip(*post_normalized_spilt_datasets)
+
+    def import_csmar_data(self):
+        """
+        At the price of losing some generalizability, this function loads the data needed by the coursework
+        :return:
+        """
+        pass
 
     @staticmethod
     def check_features(features: list[int]):
