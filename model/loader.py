@@ -13,6 +13,10 @@ from typing import Callable, TypeVar, Optional
 import pandas as pd
 from typing_extensions import Iterable
 
+"""
+This module is responsible for loading the csv data.
+"""
+
 
 def print_if(condition: bool, message: str) -> None:
     if condition:

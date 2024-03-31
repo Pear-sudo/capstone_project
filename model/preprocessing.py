@@ -12,6 +12,10 @@ from tabulate import tabulate
 from model.config import DataConfig, DataConfigLayout
 from model.loader import CsmarData, CsmarColumnInfo
 
+"""
+This module preprocesses the data loaded by the 'loader' before passing it to 'window' module
+"""
+
 pd.options.mode.copy_on_write = True
 
 logger = logging.getLogger(Path(__file__).name)

@@ -4,6 +4,10 @@ import tensorflow as tf
 
 from model.window import WindowGenerator
 
+"""
+This module groups training related functions.
+"""
+
 MAX_EPOCHS = 1000
 PATIENCE = 10
 

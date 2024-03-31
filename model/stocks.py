@@ -9,6 +9,10 @@ from psycopg.rows import Row
 
 from model.db import Database
 
+"""
+This module contains the specialized functions for stock data
+"""
+
 
 class DataFragment(Enum):
     TRAINING = "training"

@@ -9,6 +9,10 @@ from yaml import Loader
 
 from model.loader import *
 
+"""
+This module is responsible for creating, updating and loading config files in yaml format.
+"""
+
 
 @dataclass
 class Default:

@@ -132,7 +132,8 @@ class WindowGenerator:
         # the memory consumption at this point is about 559M
         self.train_dfs, self.val_dfs, self.test_dfs = zip(*post_normalized_spilt_datasets)
 
-    def check_features(self, features: list[int]):
+    @staticmethod
+    def check_features(features: list[int]):
         if len(set(features)) != 1:
             print(len(set(features)))
             print(features)
