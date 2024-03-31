@@ -82,12 +82,17 @@ class Translation(Enum):
     DELTA = 'delta'
 
 
+class Granularity(Enum):
+    DAILY = 'daily'
+    YEARLY = 'yearly'
+
+
 class Preprocessor:
     def __init__(self, strategy: LoadingStrategy):
         self.strategy = strategy
         self.granularity_dic = {
-            'year': ['Sgnyea'],
-            'day': ['Trddt']
+            Granularity.YEARLY: ['Sgnyea'],
+            Granularity.DAILY: ['Trddt']
         }
 
     @staticmethod
@@ -223,7 +228,17 @@ class Preprocessor:
 
         return df
 
-    def detect_granularity(self, column_names: list[str], strict: bool = True, granularity_dic=None) -> tuple[str, str]:
+    def detect_granularity(self,
+                           column_names: list[str],
+                           strict: bool = True,
+                           granularity_dic=None) -> tuple[Granularity, str]:
+        """
+
+        :param column_names:
+        :param strict:
+        :param granularity_dic:
+        :return: (granularity, col_name)
+        """
         if granularity_dic is None:
             granularity_dic = self.granularity_dic
         detected_granularity = {}
@@ -289,9 +304,9 @@ class Preprocessor:
                 origin_dc = date_column_name
 
         if origin_dc is None:
-            origin_dc = self.detect_granularity(origin.columns, strict=False)[1]
+            _, origin_dc, origin = self.detect_fill_granularity(origin, strict=False)
         if new_dc is None:
-            new_dc = self.detect_granularity(new.columns, strict=False)[1]
+            _, new_dc, new = self.detect_fill_granularity(new, strict=False)
 
         combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
 
@@ -301,6 +316,43 @@ class Preprocessor:
             combined.rename(columns={origin_dc: date_column_name}, inplace=True)
 
         return combined
+
+    def detect_fill_granularity(self,
+                                df: pd.DataFrame,
+                                strict: bool = True,
+                                granularity_dic=None) -> tuple[Granularity, str, pd.DataFrame]:
+        granularity, col_name = self.detect_granularity(df.columns, strict=strict, granularity_dic=granularity_dic)
+        if granularity is Granularity.DAILY:
+            pass
+        elif granularity is Granularity.YEARLY:
+            df = self.fill_yearly_data(df, col_name)
+        else:
+            raise RuntimeError(f"Unrecognized granularity")
+
+        return granularity, col_name, df
+
+    @staticmethod
+    def fill_yearly_data(df: pd.DataFrame, year_column: str) -> pd.DataFrame:
+        expanded_df = pd.DataFrame()
+
+        for i, row in df.iterrows():
+            year = row[year_column].astype(int)
+            start_date = pd.Timestamp(year=year, month=1, day=1)
+            end_date = pd.Timestamp(year=year, month=12, day=31)
+            dates = pd.date_range(start=start_date, end=end_date, freq='D')
+
+            row_data = row.drop(year_column).to_dict()
+            year_df = pd.DataFrame({
+                year_column: dates,
+                **row_data
+            })
+
+            expanded_df = pd.concat([expanded_df, year_df], ignore_index=True)
+
+        # correct the type
+        expanded_df[year_column] = expanded_df[year_column].dt.strftime('%Y-%m-%d')
+
+        return expanded_df
 
     @staticmethod
     def summarize_csmar_data(datas: list[CsmarData]):
