@@ -7,7 +7,7 @@ from itertools import chain
 import yaml
 from yaml import Loader
 
-from loader import *
+from model.loader import *
 
 
 @dataclass
