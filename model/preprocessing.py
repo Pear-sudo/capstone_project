@@ -477,8 +477,7 @@ class Preprocessor:
     def is_valid_date(s: str) -> bool:
         return bool(re.match(r'^\d{4}-\d{2}-\d{2}$', str(s)))  # that's why I hate python
 
-    def normalize_dataset(self, df: pd.DataFrame) -> Optional[
-        pd.DataFrame]:
+    def normalize_dataset(self, df: pd.DataFrame) -> Optional[pd.DataFrame]:
         if len(df.columns) != self.strategy.raw_columns and self.strategy.raw_columns is not None:
             raise ValueError(f"Expected {self.strategy.raw_columns} raw columns, found {len(df.columns)}")
 

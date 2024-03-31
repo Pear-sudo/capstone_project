@@ -142,6 +142,11 @@ class WindowGenerator:
         features = [t[0].shape[1] for t in post_normalized_spilt_datasets]
         self.check_features(features)  # this often goes wrong
         # the memory consumption at this point is about 559M
+
+        # please note zip() below is applied to a list of tuples (all have size 3)
+        # that's why dfs means dataframes
+        # to understand its usage, see make_mixed_dataset()
+        # personally, I have some doubt about whether this leads to data leakage
         self.train_dfs, self.val_dfs, self.test_dfs = zip(*post_normalized_spilt_datasets)
 
     def import_csmar_data(self):
@@ -377,3 +382,11 @@ class WindowGeneratorStock(WindowGenerator):
         if plot_col is None:
             plot_col = WindowGeneratorStock.label_column
         super().plot(plot_col, model, max_subplots)
+
+
+if __name__ == "__main__":
+    conv_window = WindowGeneratorStock(
+        input_width=3,
+        label_width=1,
+        shift=1,
+        data='../data/raw/stocks')
