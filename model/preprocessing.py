@@ -1,5 +1,7 @@
 import logging
+import random
 import re
+import string
 from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Optional
@@ -191,6 +193,7 @@ class Preprocessor:
     def execute_instruction(self, df: pd.DataFrame, column_infos: list[CsmarColumnInfo]) -> pd.DataFrame:
         special_columns = []
         ordinary_columns = []
+        _, granularity_column = self.detect_granularity(df.columns)
         for c in column_infos:
             if 's' in self.split_instructions(c.instruction):
                 special_columns.append(c)
@@ -205,7 +208,6 @@ class Preprocessor:
                     case 's':
                         # split into columns
                         suffixes = df[info.column_name].unique()
-                        _, granularity_column = self.detect_granularity(df.columns)
                         new_df = pd.DataFrame()
                         for suffix in suffixes:
                             partition = df[df[info.column_name] == suffix].copy()
@@ -230,6 +232,19 @@ class Preprocessor:
             for column_name in column_names:
                 if info.instruction.strip() == '':
                     # perform default transform
+                    df = self.auto_transform_column(df, column_name)
+                else:
+                    instructions: list[str] = self.split_instructions(info.instruction)
+                    for i in instructions:
+                        match i:
+                            case 'max':
+                                idx = df.groupby(granularity_column)[column_name].idxmax()
+                                df = df.loc[idx]
+                            case 'min':
+                                idx = df.groupby(granularity_column)[column_name].idxmin()
+                                df = df.loc[idx]
+                            case _:
+                                raise RuntimeError(f"Invalid instruction: {i}")
                     df = self.auto_transform_column(df, column_name)
 
         return df
@@ -306,6 +321,14 @@ class Preprocessor:
                     return date_column_name
             return date_column_to_detect
 
+        def check_df_key(df: pd.DataFrame, key_col: str):
+            if df[key_col].isna().any():
+                raise RuntimeError(f"Key {key_col} has NaN values")
+            d = df[key_col].duplicated()
+            if d.any():
+                criminal = df[df.duplicated(key_col, keep=False)]
+                raise RuntimeError(f"Key {key_col} has duplicated values")
+
         if len(origin.columns) == 0:
             return new
 
@@ -330,27 +353,25 @@ class Preprocessor:
             else:
                 _, new_dc = self.detect_granularity(new.columns, strict=False)
 
-        combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
+        check_df_key(origin, origin_dc)
+        check_df_key(new, new_dc)
+        combined = None
+        if origin_dc == new_dc:
+            combined = pd.merge(origin, new, on=origin_dc, how='outer')
+        else:
+            # we need to mimic coalesce in sql, otherwise there will be nan in the key, which is fatal
+            combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
+            intermediate_col = ''.join(random.choices(string.ascii_letters, k=10))
+            combined[intermediate_col] = combined[origin_dc].combine_first(combined[new_dc])
+            combined = combined.drop([origin_dc, new_dc], axis=1)
+            combined.rename(columns={intermediate_col: origin_dc}, inplace=True)
 
-        if origin_dc != new_dc:
-            # do not accidentally drop the only date column
-            combined.drop(columns=[new_dc], inplace=True)
+        # let's do some security check
+        check_df_key(combined, origin_dc)
 
         if date_column_name and date_column_name not in combined.columns:
             if fill or origin_g is Granularity.DAILY:
                 combined.rename(columns={origin_dc: date_column_name}, inplace=True)
-
-        # test if all right
-        if date_column_name in combined.columns:
-            h = combined.head(1)
-            t = combined.tail(1)
-            hd = h[date_column_name][0]
-            td = t[date_column_name][0]
-            if type(hd) is not str or type(td) is not str:
-                raise RuntimeError('Date column should be of type str')
-
-            if not combined[date_column_name].is_unique:
-                raise RuntimeError('Found duplicated date')
 
         return combined
 
