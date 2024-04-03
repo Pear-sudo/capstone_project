@@ -91,6 +91,7 @@ class Translation(Enum):
 class Granularity(Enum):
     DAILY = 'daily'
     YEARLY = 'yearly'
+    MONTHLY = 'monthly'
 
 
 class Preprocessor:
@@ -98,6 +99,7 @@ class Preprocessor:
         self.strategy = strategy
         self.granularity_dic = {
             Granularity.YEARLY: ['Sgnyea'],
+            Granularity.MONTHLY: ['Staper'],
             Granularity.DAILY: ['Trddt', 'Exchdt', 'Clsdt', 'Date']
         }
 
@@ -174,9 +176,13 @@ class Preprocessor:
             for info in columns_to_filter:
                 # split the filter's instructions
                 fs: list[str] = [f.strip() for f in info.filter.strip().split(',')]
-                # todo this is not safe, add checking
-                fs_series = pd.Series(fs).astype(int)
+                if not fs[0] in string.ascii_letters:
+                    fs_series = pd.Series(fs).astype(int)
+                else:
+                    fs_series = pd.Series(fs)
                 df = df[df[info.column_name].isin(fs_series)]
+                if fs[0] in string.ascii_letters:
+                    df.drop(info.column_name, axis=1, inplace=True)
 
             # transform the data
             df = self.execute_instruction(df, enabled_columns)
