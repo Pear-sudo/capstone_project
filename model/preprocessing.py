@@ -96,7 +96,7 @@ class Preprocessor:
         self.strategy = strategy
         self.granularity_dic = {
             Granularity.YEARLY: ['Sgnyea'],
-            Granularity.DAILY: ['Trddt']
+            Granularity.DAILY: ['Trddt', 'Exchdt', 'Clsdt', 'Date']
         }
 
     @staticmethod
@@ -205,12 +205,14 @@ class Preprocessor:
                     case 's':
                         # split into columns
                         suffixes = df[info.column_name].unique()
+                        _, granularity_column = self.detect_granularity(df.columns)
                         new_df = pd.DataFrame()
                         for suffix in suffixes:
                             partition = df[df[info.column_name] == suffix].copy()
                             partition = partition.drop(columns=[info.column_name])
-                            partition.columns = [f"{name}_{suffix}" for name in partition.columns]
-                            new_df = self.combine_dataframes(new_df, partition)
+                            partition.columns = [f"{name}_{suffix}" if name != granularity_column else name
+                                                 for name in partition.columns]
+                            new_df = self.combine_dataframes(new_df, partition, fill=False)
                         df = new_df
                     case _:
                         raise RuntimeError(f"Invalid instruction: {i}")
@@ -261,7 +263,7 @@ class Preprocessor:
 
         # error checking
         if granularity_len == 0:
-            raise RuntimeError('Cannot detect any time granularity')
+            raise RuntimeError(f'Cannot detect any time granularity in the following columns: {column_names}')
         elif granularity_len == 1:
             granularity_cols = list(detected_granularity.values())[0]
             if len(detected_granularity) == 1:
@@ -285,9 +287,11 @@ class Preprocessor:
                            new: pd.DataFrame,
                            origin_dc: str | None = None,
                            new_dc: str | None = None,
-                           date_column_name: str | None = 'Date') -> pd.DataFrame:
+                           date_column_name: str | None = 'Date',
+                           fill: bool = True) -> pd.DataFrame:
         """
         Combines two dataframes, respecting the time.
+        :param fill: if fill to date
         :param date_column_name:
         :param new_dc: date column
         :param origin_dc: date column
@@ -295,6 +299,13 @@ class Preprocessor:
         :param new:
         :return:
         """
+
+        def detect_date_column_name(date_column_to_detect: str | None, df: pd.DataFrame) -> None | str:
+            if date_column_name is not None and date_column_to_detect is None:
+                if date_column_name in df.columns:
+                    return date_column_name
+            return date_column_to_detect
+
         if len(origin.columns) == 0:
             return new
 
@@ -303,21 +314,43 @@ class Preprocessor:
         if new_dc is not None and new_dc not in new.columns:
             raise ValueError(f"'{new_dc}' not found in '{new.columns}'")
 
-        if date_column_name is not None and origin_dc is None:
-            if date_column_name in origin.columns:
-                origin_dc = date_column_name
+        origin_dc = detect_date_column_name(origin_dc, origin)
+        new_dc = detect_date_column_name(new_dc, new)
+
+        origin_g = None
 
         if origin_dc is None:
-            _, origin_dc, origin = self.detect_fill_granularity(origin, strict=False)
+            if fill:
+                _, origin_dc, origin = self.detect_fill_granularity(origin, strict=False)
+            else:
+                origin_g, origin_dc = self.detect_granularity(origin.columns, strict=False)
         if new_dc is None:
-            _, new_dc, new = self.detect_fill_granularity(new, strict=False)
+            if fill:
+                _, new_dc, new = self.detect_fill_granularity(new, strict=False)
+            else:
+                _, new_dc = self.detect_granularity(new.columns, strict=False)
 
         combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
 
-        combined.drop(columns=[new_dc], inplace=True)
+        if origin_dc != new_dc:
+            # do not accidentally drop the only date column
+            combined.drop(columns=[new_dc], inplace=True)
 
         if date_column_name and date_column_name not in combined.columns:
-            combined.rename(columns={origin_dc: date_column_name}, inplace=True)
+            if fill or origin_g is Granularity.DAILY:
+                combined.rename(columns={origin_dc: date_column_name}, inplace=True)
+
+        # test if all right
+        if date_column_name in combined.columns:
+            h = combined.head(1)
+            t = combined.tail(1)
+            hd = h[date_column_name][0]
+            td = t[date_column_name][0]
+            if type(hd) is not str or type(td) is not str:
+                raise RuntimeError('Date column should be of type str')
+
+            if not combined[date_column_name].is_unique:
+                raise RuntimeError('Found duplicated date')
 
         return combined
 
@@ -325,7 +358,9 @@ class Preprocessor:
                                 df: pd.DataFrame,
                                 strict: bool = True,
                                 granularity_dic=None) -> tuple[Granularity, str, pd.DataFrame]:
-        granularity, col_name = self.detect_granularity(df.columns, strict=strict, granularity_dic=granularity_dic)
+        granularity, col_name = self.detect_granularity(df.columns.tolist(),
+                                                        strict=strict,
+                                                        granularity_dic=granularity_dic)
         if granularity is Granularity.DAILY:
             pass
         elif granularity is Granularity.YEARLY:
