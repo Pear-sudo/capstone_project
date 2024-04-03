@@ -183,6 +183,7 @@ class Preprocessor:
                 df = df[df[info.column_name].isin(fs_series)]
                 if fs[0] in string.ascii_letters:
                     df.drop(info.column_name, axis=1, inplace=True)
+                    enabled_columns.remove(info)
 
             # transform the data
             df = self.execute_instruction(df, enabled_columns)
@@ -392,10 +393,40 @@ class Preprocessor:
             pass
         elif granularity is Granularity.YEARLY:
             df = self.fill_yearly_data(df, col_name)
+        elif granularity is Granularity.MONTHLY:
+            df = self.fill_monthly_data(df, col_name)
         else:
             raise RuntimeError(f"Unrecognized granularity")
 
         return granularity, col_name, df
+
+    @staticmethod
+    def fill_monthly_data(df: pd.DataFrame, year_column: str) -> pd.DataFrame:
+        expanded_df = pd.DataFrame()
+
+        for i, row in df.iterrows():
+            s: str = row[year_column]
+            tokens = s.split('-')
+            year = int(tokens[0])
+            month = int(tokens[1])
+            start_date = pd.Timestamp(year=year, month=month, day=1)
+            end_date = pd.Timestamp(year=year, month=month, day=1) + pd.offsets.MonthEnd(1)
+            dates = pd.date_range(start=start_date, end=end_date, freq='D')
+
+            row_data = row.drop(year_column).to_dict()
+            year_df = pd.DataFrame({
+                year_column: dates,
+                **row_data
+            })
+
+            expanded_df = pd.concat([expanded_df, year_df], ignore_index=True)
+
+        # correct the type
+        expanded_df[year_column] = expanded_df[year_column].dt.strftime('%Y-%m-%d')
+
+        return expanded_df
+
+
 
     @staticmethod
     def fill_yearly_data(df: pd.DataFrame, year_column: str) -> pd.DataFrame:
