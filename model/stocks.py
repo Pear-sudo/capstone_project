@@ -1,12 +1,15 @@
 import csv
 import os
 from enum import Enum, auto
+from pathlib import Path
 from string import Template
 from typing import Optional
 
+import pandas as pd
 from psycopg import Cursor
 from psycopg.rows import Row
 
+from loader import head, tail
 from model.db import Database
 
 """
@@ -169,5 +172,17 @@ class Stock(Database):
                 )
 
 
+def find_start_end():
+    paths = list(Path("../data/raw/stocks").iterdir())
+    data = []
+    for path in paths:
+        stock_id = path.stem
+        start = head(path, 2)[1].split(',')[1].strip()
+        end = tail(path, 1)[0].split(',')[1].strip()
+        data.append([stock_id, start, end])
+    df = pd.DataFrame(data, columns=['stock_id', 'start', 'end'])
+    df.to_clipboard(index=False)
+
+
 if __name__ == '__main__':
-    Stocks().export_to_csv()
+    find_start_end()
