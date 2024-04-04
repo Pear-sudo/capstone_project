@@ -625,11 +625,11 @@ class Preprocessor:
                 kurt = df[column_name].kurt()
                 stat['Kurt'].append(kurt)
 
-                return df
+            return df
 
         dd = _summarize_csmar_data(daily_data)
-        dm = _summarize_csmar_data(monthly_data)
-        dy = _summarize_csmar_data(yearly_data)
+        # dm = _summarize_csmar_data(monthly_data)
+        # dy = _summarize_csmar_data(yearly_data)
 
         summary_df = pd.DataFrame(summary)
         stat_df = pd.DataFrame(stat)
