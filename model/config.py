@@ -64,8 +64,12 @@ def iter_dir(directory: Path,
             if_else(path)
 
 
-def latest_file(paths: Iterable[Path]) -> Path:
-    return max(paths, key=lambda path: path.stat().st_ctime)
+def latest_file(paths: Iterable[Path]) -> Path | None:
+    try:
+        latest: Path = max(paths, key=lambda path: path.stat().st_ctime)
+    except ValueError:
+        return None
+    return latest
 
 
 def hash_file(filename):
@@ -246,7 +250,11 @@ class DataConfig:
                 raise RuntimeError(f"Config dir damaged: do not found {path}")
 
     def make_backup(self):
+        if not self.layout.backup.exists():
+            return
         last_backup = latest_file(self.layout.backup.iterdir())
+        if last_backup is None:
+            return
         old_hash = hash_file(last_backup)
 
         output_path = self.layout.backup.joinpath(make_timestamp() + '.zip')

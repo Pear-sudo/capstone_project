@@ -426,8 +426,6 @@ class Preprocessor:
 
         return expanded_df
 
-
-
     @staticmethod
     def fill_yearly_data(df: pd.DataFrame, year_column: str) -> pd.DataFrame:
         expanded_df = pd.DataFrame()
