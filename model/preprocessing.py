@@ -510,6 +510,8 @@ class Preprocessor:
             'Kurt': []
         }
 
+        count = 0
+
         daily_data = []
         monthly_data = []
         yearly_data = []
@@ -527,96 +529,98 @@ class Preprocessor:
                 case _:
                     raise RuntimeError('Unknown granularity')
 
-        anchor = None
-        for data in datas:
-            name = data.csmar_datasheet.data_name
-            if name == 'Aggregated Daily Market Returns':
-                anchor = data
-                break
-        df = self.load_normalized_csmar_data(datas, no_transform=True, anchor=anchor)
+        def _summarize_csmar_data(datas: list[CsmarData], count=count):
+            anchor = None
+            for data in datas:
+                name = data.csmar_datasheet.data_name
+                if name == 'Aggregated Daily Market Returns':
+                    anchor = data
+                    break
+            df = self.load_normalized_csmar_data(datas, no_transform=True, anchor=anchor)
 
-        count = 0
-        granularity, granularity_col_name = self.detect_granularity(df.columns)
-        # we do not need to summarize date
-        column_names: list[str] = [c for c in df.columns if c != granularity_col_name]
-        # do not use the infos in the data sheet since some column may be discarded according to loading strategy
-        for column_name in column_names:
-            column_infos = self.column_map[column_name]
-            if len(column_infos) > 2:
-                raise RuntimeError('Do not currently support more than 2 foreign columns')
-            self_column_info: CsmarColumnInfo = column_infos[0]
-            foreign_column_info: CsmarColumnInfo | None = None
-            if len(column_infos) == 2:
-                foreign_column_info = column_infos[1]
-            if not self_column_info.enabled:
-                continue
+            granularity, granularity_col_name = self.detect_granularity(df.columns)
+            # we do not need to summarize date
+            column_names: list[str] = [c for c in df.columns if c != granularity_col_name]
+            # do not use the infos in the data sheet since some column may be discarded according to loading strategy
+            for column_name in column_names:
+                column_infos = self.column_map[column_name]
+                if len(column_infos) > 2:
+                    raise RuntimeError('Do not currently support more than 2 foreign columns')
+                self_column_info: CsmarColumnInfo = column_infos[0]
+                foreign_column_info: CsmarColumnInfo | None = None
+                if len(column_infos) == 2:
+                    foreign_column_info = column_infos[1]
+                if not self_column_info.enabled:
+                    continue
 
-            number = count + 1  # begin with 1
-            summary['Series Number'].append(number)
-            count += 1
+                number = count + 1  # begin with 1
+                summary['Series Number'].append(number)
+                count += 1
 
-            frequency = granularity.value
-            summary['Frequency'].append(frequency)
+                frequency = granularity.value
+                summary['Frequency'].append(frequency)
 
-            acronym = column_name
-            summary['Acronym'].append(acronym)
+                acronym = column_name
+                summary['Acronym'].append(acronym)
 
-            fullname = self_column_info.full_name
-            if count_words(fullname) <= 1:
-                fullname = self_column_info.explanation
-            if foreign_column_info:
-                foreign_explanation = foreign_column_info.explanation
-                token_dic: Dict[str, str] = {}
-                if ';' in foreign_explanation:
-                    tokens = [t.strip() for t in foreign_explanation.split(';')]
-                    for token in tokens:
-                        kv = token.split('=')
-                        k = kv[0].strip()
-                        if k == 'JYP':
-                            k = 'JPY'
-                        v = kv[1].strip()
-                        token_dic[k] = v
-                elif ':' in foreign_explanation:
-                    split_pattern = r'(?<=\D)(?=\d{6})'
-                    tokens = re.split(split_pattern, foreign_explanation)
-                    for token in tokens:
-                        kv = token.split(':')
-                        k = kv[0].strip()
-                        if all(c in string.digits for c in k):
-                            k = str(int(k))
-                        v = kv[1].strip()
-                        token_dic[k] = v
-                if len(token_dic) > 0:
-                    k = acronym.split('_')[-1]
-                    v = token_dic[k]
-                    fullname = fullname + f' ({v})'
-            summary['Fullname'].append(fullname)
+                fullname = self_column_info.full_name
+                if count_words(fullname) <= 1:
+                    fullname = self_column_info.explanation
+                if foreign_column_info:
+                    foreign_explanation = foreign_column_info.explanation
+                    token_dic: Dict[str, str] = {}
+                    if ';' in foreign_explanation:
+                        tokens = [t.strip() for t in foreign_explanation.split(';')]
+                        for token in tokens:
+                            kv = token.split('=')
+                            k = kv[0].strip()
+                            if k == 'JYP':
+                                k = 'JPY'
+                            v = kv[1].strip()
+                            token_dic[k] = v
+                    elif ':' in foreign_explanation:
+                        split_pattern = r'(?<=\D)(?=\d{6})'
+                        tokens = re.split(split_pattern, foreign_explanation)
+                        for token in tokens:
+                            kv = token.split(':')
+                            k = kv[0].strip()
+                            if all(c in string.digits for c in k):
+                                k = str(int(k))
+                            v = kv[1].strip()
+                            token_dic[k] = v
+                    if len(token_dic) > 0:
+                        k = acronym.split('_')[-1]
+                        v = token_dic[k]
+                        fullname = fullname + f' ({v})'
+                summary['Fullname'].append(fullname)
 
-            description = self_column_info.explanation  # let's treat full name as description
-            summary['Description'].append(description)
+                description = self_column_info.explanation  # let's treat full name as description
+                summary['Description'].append(description)
 
-            stat['Acronym'].append(acronym)
+                stat['Acronym'].append(acronym)
 
-            obs = len(df)
-            stat['Obs'].append(obs)
+                obs = len(df)
+                stat['Obs'].append(obs)
 
-            mean = df[column_name].mean()
-            stat['Mean'].append(mean)
+                mean = df[column_name].mean()
+                stat['Mean'].append(mean)
 
-            max_val = df[column_name].max()
-            stat['Max'].append(max_val)
+                max_val = df[column_name].max()
+                stat['Max'].append(max_val)
 
-            min_val = df[column_name].min()
-            stat['Min'].append(min_val)
+                min_val = df[column_name].min()
+                stat['Min'].append(min_val)
 
-            std = df[column_name].std()
-            stat['Std'].append(std)
+                std = df[column_name].std()
+                stat['Std'].append(std)
 
-            skew = df[column_name].skew()
-            stat['Skew'].append(skew)
+                skew = df[column_name].skew()
+                stat['Skew'].append(skew)
 
-            kurt = df[column_name].kurt()
-            stat['Kurt'].append(kurt)
+                kurt = df[column_name].kurt()
+                stat['Kurt'].append(kurt)
+
+        _summarize_csmar_data(daily_data)
 
         summary_df = pd.DataFrame(summary)
         stat_df = pd.DataFrame(stat)
