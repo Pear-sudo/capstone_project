@@ -44,6 +44,7 @@ class LoadingStrategy:
         self.expected_columns: Optional[int] = None
 
         self.beginning_year = None
+        self.ending_year = None
 
 
 class StockLoadingStrategy(LoadingStrategy):
@@ -60,7 +61,8 @@ class StockLoadingStrategy(LoadingStrategy):
         self.raw_columns = 21
         self.expected_columns = 21 - len(self.exclude) + 6 * 1  # one date column would need additional 6 columns
 
-        self.beginning_year = 1991
+        self.beginning_year = 2020
+        self.ending_year = 2023
 
 
 class Normalizer:
@@ -142,9 +144,16 @@ class Preprocessor:
                                    f"expected {len(enabled_column_names)}, "
                                    f"loaded {len(df.columns)}")
             logger.debug(f"Read {len(df.columns)} columns from {path}:\n{df.columns}")
+
+        # only select data within the date range
+        temporary_date_column_name = 'date_column_DF2ABBF3'
+        df[temporary_date_column_name] = pd.to_datetime(df[granularity_col_name])
+        df = df[(df[temporary_date_column_name].dt.year >= self.strategy.beginning_year)
+                & (df[temporary_date_column_name].dt.year <= self.strategy.ending_year)]
+        df.drop(temporary_date_column_name, axis=1, inplace=True)
         return df
 
-    def load_normalized_csmar_data(self, datas: list[CsmarData]) -> pd.DataFrame:
+    def load_normalized_csmar_data(self, datas: list[CsmarData], no_transform: bool = False) -> pd.DataFrame:
         combined = pd.DataFrame()
         for data in datas:
             csmar_directory = data.csmar_directory
@@ -186,7 +195,7 @@ class Preprocessor:
                     enabled_columns.remove(info)
 
             # transform the data
-            df = self.execute_instruction(df, enabled_columns)
+            df = self.execute_instruction(df, enabled_columns, no_transform=no_transform)
 
             combined = self.combine_dataframes(combined, df)
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
@@ -197,7 +206,8 @@ class Preprocessor:
     def split_instructions(ins: str) -> list[str]:
         return [ins.strip() for ins in ins.strip().split(',')]
 
-    def execute_instruction(self, df: pd.DataFrame, column_infos: list[CsmarColumnInfo]) -> pd.DataFrame:
+    def execute_instruction(self, df: pd.DataFrame, column_infos: list[CsmarColumnInfo],
+                            no_transform: bool = False) -> pd.DataFrame:
         special_columns = []
         ordinary_columns = []
         _, granularity_column = self.detect_granularity(df.columns)
@@ -239,9 +249,11 @@ class Preprocessor:
             for column_name in column_names:
                 if info.instruction.strip() == '':
                     # perform default transform
-                    df = self.auto_transform_column(df, column_name)
+                    if not no_transform:
+                        df = self.auto_transform_column(df, column_name)
                 else:
                     instructions: list[str] = self.split_instructions(info.instruction)
+                    no_transform_by_instruction = False
                     for i in instructions:
                         match i:
                             case 'max':
@@ -250,9 +262,14 @@ class Preprocessor:
                             case 'min':
                                 idx = df.groupby(granularity_column)[column_name].idxmin()
                                 df = df.loc[idx]
+                            case 'd':
+                                # drop/delete the row
+                                df = df.drop(column_name, axis=1)
+                                no_transform_by_instruction = True  # do not perform transform on this column
                             case _:
                                 raise RuntimeError(f"Invalid instruction: {i}")
-                    df = self.auto_transform_column(df, column_name)
+                    if not no_transform and not no_transform_by_instruction:
+                        df = self.auto_transform_column(df, column_name)
 
         return df
 
@@ -612,4 +629,4 @@ if __name__ == "__main__":
     config = DataConfig(DataConfigLayout(Path('./config/data')))
     config.auto_config(r'/Users/a/playground/freestyle/')
     preprocessor = Preprocessor(StockLoadingStrategy())
-    preprocessor.load_normalized_csmar_data(config.derived_csmar_datas)
+    preprocessor.load_normalized_csmar_data(config.derived_csmar_datas, no_transform=True)
