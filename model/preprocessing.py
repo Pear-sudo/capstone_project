@@ -157,12 +157,14 @@ class Preprocessor:
         df.drop(temporary_date_column_name, axis=1, inplace=True)
         return df
 
-    def load_normalized_csmar_data(self, datas: list[CsmarData], no_transform: bool = False,
+    def load_normalized_csmar_data(self, datas: list[CsmarData],
+                                   no_transform: bool = False,
+                                   fill: bool = True,
                                    anchor: CsmarData = None) -> pd.DataFrame:
         combined = pd.DataFrame()
         if anchor:
             datas.remove(anchor)
-            combined = self.load_normalized_csmar_data([anchor], no_transform=no_transform)
+            combined = self.load_normalized_csmar_data([anchor], no_transform=no_transform, fill=fill)
         for data in datas:
             csmar_directory = data.csmar_directory
             data_path = csmar_directory.data
@@ -210,7 +212,7 @@ class Preprocessor:
             df = self.execute_instruction(df, enabled_columns, no_transform=no_transform)
 
             left_join = False if anchor is None else True
-            combined = self.combine_dataframes(combined, df, left_join=left_join)
+            combined = self.combine_dataframes(combined, df, left_join=left_join, fill=fill)
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
         logger.info("Loading finished.")
         return combined
@@ -219,7 +221,8 @@ class Preprocessor:
     def split_instructions(ins: str) -> list[str]:
         return [ins.strip() for ins in ins.strip().split(',')]
 
-    def execute_instruction(self, df: pd.DataFrame, column_infos: list[CsmarColumnInfo],
+    def execute_instruction(self, df: pd.DataFrame,
+                            column_infos: list[CsmarColumnInfo],
                             no_transform: bool = False) -> pd.DataFrame:
         special_columns = []
         ordinary_columns = []
@@ -514,7 +517,14 @@ class Preprocessor:
             'Kurt': []
         }
 
-        count = 0
+        class Count:
+            def __init__(self):
+                self.value = 0
+
+            def increment(self):
+                self.value += 1
+
+        count = Count()
 
         daily_data = []
         monthly_data = []
@@ -543,7 +553,7 @@ class Preprocessor:
                 if name == 'Aggregated Daily Market Returns':
                     anchor = data
                     break
-            df = self.load_normalized_csmar_data(datas, no_transform=True, anchor=anchor)
+            df = self.load_normalized_csmar_data(datas, no_transform=True, anchor=anchor, fill=False)
             if len(df) == 0:
                 return
 
@@ -562,9 +572,9 @@ class Preprocessor:
                 if not self_column_info.enabled:
                     continue
 
-                number = count + 1  # begin with 1
+                number = count.value + 1  # begin with 1
                 summary['Series Number'].append(number)
-                count += 1
+                count.increment()
 
                 frequency = granularity.value
                 summary['Frequency'].append(frequency)
@@ -573,7 +583,7 @@ class Preprocessor:
                 summary['Acronym'].append(acronym)
 
                 fullname = self_column_info.full_name
-                if count_words(fullname) <= 1:
+                if count_words(fullname) <= 1 and self_column_info.explanation != '':
                     fullname = self_column_info.explanation
                 if foreign_column_info:
                     foreign_explanation = foreign_column_info.explanation
@@ -638,7 +648,7 @@ class Preprocessor:
 
             return df
 
-        # dd = _summarize_csmar_data(daily_data)
+        dd = _summarize_csmar_data(daily_data)
         dm = _summarize_csmar_data(monthly_data)
         # dy = _summarize_csmar_data(yearly_data)
 
