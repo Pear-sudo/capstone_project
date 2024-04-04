@@ -486,56 +486,48 @@ class Preprocessor:
             'Skew': [],
             'Kurt': []
         }
+
+        df = self.load_normalized_csmar_data(datas, no_transform=True)
+
         count = 0
-        for data in datas:
-            data_sheet = data.csmar_datasheet
-
-            if data_sheet.disabled:
+        _, g_name = self.detect_granularity(df.columns)
+        column_infos = [self.column_map[c] for c in df.columns if c != g_name]  # we do not need to summarize date
+        # do not use the infos in the data sheet since some column may be discarded according to loading strategy
+        for column_info in column_infos:
+            if not column_info.enabled:
                 continue
 
-            enabled_columns = [c for c in data_sheet.column_infos if c.enabled]
-            if len(enabled_columns) == 0:
-                continue
+            number = count + 1  # begin with 1
+            summary['Series Number'].append(number)
+            count += 1
 
-            df = self.load_normalized_csmar_data([data], no_transform=True)
-            _, g_name = self.detect_granularity(df.columns)
-            column_infos = [self.column_map[c] for c in df.columns if c != g_name]  # we do not need to summarize date
-            # do not use the infos in the data sheet since some column may be discarded according to loading strategy
-            for column_info in column_infos:
-                if not column_info.enabled:
-                    continue
+            acronym = column_info.column_name
+            summary['Acronym'].append(acronym)
+            description = column_info.full_name  # let's treat full name as description
+            summary['Description'].append(description)
 
-                number = count + 1  # begin with 1
-                summary['Series Number'].append(number)
-                count += 1
+            stat['Acronym'].append(acronym)
 
-                acronym = column_info.column_name
-                summary['Acronym'].append(acronym)
-                description = column_info.full_name  # let's treat full name as description
-                summary['Description'].append(description)
+            obs = len(df)
+            stat['Obs'].append(obs)
 
-                stat['Acronym'].append(acronym)
+            mean = df[column_info.column_name].mean()
+            stat['Mean'].append(mean)
 
-                obs = len(df)
-                stat['Obs'].append(obs)
+            max_val = df[column_info.column_name].max()
+            stat['Max'].append(max_val)
 
-                mean = df[column_info.column_name].mean()
-                stat['Mean'].append(mean)
+            min_val = df[column_info.column_name].min()
+            stat['Min'].append(min_val)
 
-                max_val = df[column_info.column_name].max()
-                stat['Max'].append(max_val)
+            std = df[column_info.column_name].std()
+            stat['Std'].append(std)
 
-                min_val = df[column_info.column_name].min()
-                stat['Min'].append(min_val)
+            skew = df[column_info.column_name].skew()
+            stat['Skew'].append(skew)
 
-                std = df[column_info.column_name].std()
-                stat['Std'].append(std)
-
-                skew = df[column_info.column_name].skew()
-                stat['Skew'].append(skew)
-
-                kurt = df[column_info.column_name].kurt()
-                stat['Kurt'].append(kurt)
+            kurt = df[column_info.column_name].kurt()
+            stat['Kurt'].append(kurt)
 
         summary_df = pd.DataFrame(summary)
         stat_df = pd.DataFrame(stat)
