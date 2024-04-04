@@ -544,18 +544,30 @@ class Preprocessor:
                 fullname = self_column_info.explanation
             if foreign_column_info:
                 foreign_explanation = foreign_column_info.explanation
-                tokens = [t.strip() for t in foreign_explanation.split(';')]
                 token_dic: Dict[str, str] = {}
-                for token in tokens:
-                    kv = token.split('=')
-                    k = kv[0].strip()
-                    if k == 'JYP':
-                        k = 'JPY'
-                    v = kv[1].strip()
-                    token_dic[k] = v
-                k = acronym.split('_')[-1]
-                v = token_dic[k]
-                fullname = fullname + f' ({v})'
+                if ';' in foreign_explanation:
+                    tokens = [t.strip() for t in foreign_explanation.split(';')]
+                    for token in tokens:
+                        kv = token.split('=')
+                        k = kv[0].strip()
+                        if k == 'JYP':
+                            k = 'JPY'
+                        v = kv[1].strip()
+                        token_dic[k] = v
+                elif ':' in foreign_explanation:
+                    split_pattern = r'(?<=\D)(?=\d{6})'
+                    tokens = re.split(split_pattern, foreign_explanation)
+                    for token in tokens:
+                        kv = token.split(':')
+                        k = kv[0].strip()
+                        if all(c in string.digits for c in k):
+                            k = str(int(k))
+                        v = kv[1].strip()
+                        token_dic[k] = v
+                if len(token_dic) > 0:
+                    k = acronym.split('_')[-1]
+                    v = token_dic[k]
+                    fullname = fullname + f' ({v})'
             summary['Fullname'].append(fullname)
 
             description = self_column_info.explanation  # let's treat full name as description
