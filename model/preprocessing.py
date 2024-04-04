@@ -529,7 +529,10 @@ class Preprocessor:
                 case _:
                     raise RuntimeError('Unknown granularity')
 
-        def _summarize_csmar_data(datas: list[CsmarData], count=count):
+        def _summarize_csmar_data(datas: list[CsmarData], count=count) -> pd.DataFrame | None:
+            if len(datas) == 0:
+                return
+
             anchor = None
             for data in datas:
                 name = data.csmar_datasheet.data_name
@@ -537,6 +540,8 @@ class Preprocessor:
                     anchor = data
                     break
             df = self.load_normalized_csmar_data(datas, no_transform=True, anchor=anchor)
+            if len(df) == 0:
+                return
 
             granularity, granularity_col_name = self.detect_granularity(df.columns)
             # we do not need to summarize date
@@ -620,7 +625,11 @@ class Preprocessor:
                 kurt = df[column_name].kurt()
                 stat['Kurt'].append(kurt)
 
-        _summarize_csmar_data(daily_data)
+                return df
+
+        dd = _summarize_csmar_data(daily_data)
+        dm = _summarize_csmar_data(monthly_data)
+        dy = _summarize_csmar_data(yearly_data)
 
         summary_df = pd.DataFrame(summary)
         stat_df = pd.DataFrame(stat)
