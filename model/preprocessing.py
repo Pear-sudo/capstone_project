@@ -31,6 +31,10 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 
+def count_words(s: str):
+    return len(s.strip().split())
+
+
 class LoadingStrategy:
     def __init__(self):
         self.include: list[str] = []
@@ -103,7 +107,7 @@ class Preprocessor:
             Granularity.MONTHLY: ['Staper'],
             Granularity.DAILY: ['Trddt', 'Exchdt', 'Clsdt', 'Date']
         }
-        self.column_map: Dict[str: CsmarColumnInfo] = {}
+        self.column_map: Dict[str: list[CsmarColumnInfo]] = {}
 
     @staticmethod
     def expect_file(path: str):
@@ -153,8 +157,12 @@ class Preprocessor:
         df.drop(temporary_date_column_name, axis=1, inplace=True)
         return df
 
-    def load_normalized_csmar_data(self, datas: list[CsmarData], no_transform: bool = False) -> pd.DataFrame:
+    def load_normalized_csmar_data(self, datas: list[CsmarData], no_transform: bool = False,
+                                   anchor: CsmarData = None) -> pd.DataFrame:
         combined = pd.DataFrame()
+        if anchor:
+            datas.remove(anchor)
+            combined = self.load_normalized_csmar_data([anchor], no_transform=no_transform)
         for data in datas:
             csmar_directory = data.csmar_directory
             data_path = csmar_directory.data
@@ -197,7 +205,8 @@ class Preprocessor:
             # transform the data
             df = self.execute_instruction(df, enabled_columns, no_transform=no_transform)
 
-            combined = self.combine_dataframes(combined, df)
+            left_join = False if anchor is None else True
+            combined = self.combine_dataframes(combined, df, left_join=left_join)
             logger.info(f"Successfully loaded normalized {data_sheet.data_name}")
         logger.info("Loading finished.")
         return combined
@@ -210,6 +219,7 @@ class Preprocessor:
                             no_transform: bool = False) -> pd.DataFrame:
         special_columns = []
         ordinary_columns = []
+        split_column_infos: list[CsmarColumnInfo] = []
         _, granularity_column = self.detect_granularity(df.columns)
         for c in column_infos:
             if 's' in self.split_instructions(c.instruction):
@@ -224,6 +234,7 @@ class Preprocessor:
                 match i:
                     case 's':
                         # split into columns
+                        split_column_infos.append(info)
                         suffixes = df[info.column_name].unique()
                         new_df = pd.DataFrame()
                         for suffix in suffixes:
@@ -275,7 +286,7 @@ class Preprocessor:
                 if not discarded:
                     if column_name in self.column_map:
                         raise RuntimeError(f"Column {column_name} already exists")
-                    self.column_map[column_name] = info
+                    self.column_map[column_name] = [info] + split_column_infos
 
         return df
 
@@ -333,9 +344,12 @@ class Preprocessor:
                            origin_dc: str | None = None,
                            new_dc: str | None = None,
                            date_column_name: str | None = 'Date',
-                           fill: bool = True) -> pd.DataFrame:
+                           fill: bool = True,
+                           left_join: bool = False
+                           ) -> pd.DataFrame:
         """
         Combines two dataframes, respecting the time.
+        :param left_join:
         :param fill: if fill to date
         :param date_column_name:
         :param new_dc: date column
@@ -386,15 +400,22 @@ class Preprocessor:
         check_df_key(origin, origin_dc)
         check_df_key(new, new_dc)
         combined = None
-        if origin_dc == new_dc:
-            combined = pd.merge(origin, new, on=origin_dc, how='outer')
+        if not left_join:
+            if origin_dc == new_dc:
+                combined = pd.merge(origin, new, on=origin_dc, how='outer')
+            else:
+                # we need to mimic coalesce in sql, otherwise there will be nan in the key, which is fatal
+                combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
+                intermediate_col = ''.join(random.choices(string.ascii_letters, k=10))
+                combined[intermediate_col] = combined[origin_dc].combine_first(combined[new_dc])
+                combined = combined.drop([origin_dc, new_dc], axis=1)
+                combined.rename(columns={intermediate_col: origin_dc}, inplace=True)
         else:
-            # we need to mimic coalesce in sql, otherwise there will be nan in the key, which is fatal
-            combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='outer')
-            intermediate_col = ''.join(random.choices(string.ascii_letters, k=10))
-            combined[intermediate_col] = combined[origin_dc].combine_first(combined[new_dc])
-            combined = combined.drop([origin_dc, new_dc], axis=1)
-            combined.rename(columns={intermediate_col: origin_dc}, inplace=True)
+            if origin_dc == new_dc:
+                combined = pd.merge(origin, new, on=origin_dc, how='left')
+            else:
+                combined = pd.merge(origin, new, left_on=origin_dc, right_on=new_dc, how='left')
+                combined.drop(new_dc, axis=1, inplace=True)
 
         # let's do some security check
         check_df_key(combined, origin_dc)
@@ -488,26 +509,56 @@ class Preprocessor:
             'Kurt': []
         }
 
-        df = self.load_normalized_csmar_data(datas, no_transform=True)
+        anchor = None
+        for data in datas:
+            name = data.csmar_datasheet.data_name
+            if name == 'Aggregated Daily Market Returns':
+                anchor = data
+                break
+        df = self.load_normalized_csmar_data(datas, no_transform=True, anchor=anchor)
 
         count = 0
         _, g_name = self.detect_granularity(df.columns)
-        column_infos: list[CsmarColumnInfo] = [self.column_map[c] for c in df.columns if
-                                               c != g_name]  # we do not need to summarize date
+        column_names: list[str] = [c for c in df.columns if c != g_name]  # we do not need to summarize date
         # do not use the infos in the data sheet since some column may be discarded according to loading strategy
-        for column_info in column_infos:
-            if not column_info.enabled:
+        for column_name in column_names:
+            column_infos = self.column_map[column_name]
+            if len(column_infos) > 2:
+                raise RuntimeError('Do not currently support more than 2 foreign columns')
+            self_column_info: CsmarColumnInfo = column_infos[0]
+            foreign_column_info: CsmarColumnInfo | None = None
+            if len(column_infos) == 2:
+                foreign_column_info = column_infos[1]
+            if not self_column_info.enabled:
                 continue
 
             number = count + 1  # begin with 1
             summary['Series Number'].append(number)
             count += 1
 
-            acronym = column_info.column_name
+            acronym = column_name
             summary['Acronym'].append(acronym)
-            fullname = column_info.full_name
+
+            fullname = self_column_info.full_name
+            if count_words(fullname) <= 1:
+                fullname = self_column_info.explanation
+            if foreign_column_info:
+                foreign_explanation = foreign_column_info.explanation
+                tokens = [t.strip() for t in foreign_explanation.split(';')]
+                token_dic: Dict[str, str] = {}
+                for token in tokens:
+                    kv = token.split('=')
+                    k = kv[0].strip()
+                    if k == 'JYP':
+                        k = 'JPY'
+                    v = kv[1].strip()
+                    token_dic[k] = v
+                k = acronym.split('_')[-1]
+                v = token_dic[k]
+                fullname = fullname + f' ({v})'
             summary['Fullname'].append(fullname)
-            description = column_info.explanation  # let's treat full name as description
+
+            description = self_column_info.explanation  # let's treat full name as description
             summary['Description'].append(description)
 
             stat['Acronym'].append(acronym)
@@ -515,22 +566,22 @@ class Preprocessor:
             obs = len(df)
             stat['Obs'].append(obs)
 
-            mean = df[column_info.column_name].mean()
+            mean = df[column_name].mean()
             stat['Mean'].append(mean)
 
-            max_val = df[column_info.column_name].max()
+            max_val = df[column_name].max()
             stat['Max'].append(max_val)
 
-            min_val = df[column_info.column_name].min()
+            min_val = df[column_name].min()
             stat['Min'].append(min_val)
 
-            std = df[column_info.column_name].std()
+            std = df[column_name].std()
             stat['Std'].append(std)
 
-            skew = df[column_info.column_name].skew()
+            skew = df[column_name].skew()
             stat['Skew'].append(skew)
 
-            kurt = df[column_info.column_name].kurt()
+            kurt = df[column_name].kurt()
             stat['Kurt'].append(kurt)
 
         summary_df = pd.DataFrame(summary)
