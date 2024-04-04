@@ -1,4 +1,5 @@
 *.ipynb
+*.xlsx
 
 **/data/**/*.csv
 model/config/data/**

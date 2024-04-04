@@ -4,12 +4,11 @@ import re
 import string
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Dict
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from tabulate import tabulate
 
 from model.config import DataConfig, DataConfigLayout
 from model.loader import CsmarData, CsmarColumnInfo
@@ -104,6 +103,7 @@ class Preprocessor:
             Granularity.MONTHLY: ['Staper'],
             Granularity.DAILY: ['Trddt', 'Exchdt', 'Clsdt', 'Date']
         }
+        self.column_map: Dict[str: CsmarColumnInfo] = {}
 
     @staticmethod
     def expect_file(path: str):
@@ -247,13 +247,14 @@ class Preprocessor:
                 column_names.append(original_column_name)
 
             for column_name in column_names:
+                # note the column_name may not be the original one if there is a combination
+                discarded = False
                 if info.instruction.strip() == '':
                     # perform default transform
                     if not no_transform:
                         df = self.auto_transform_column(df, column_name)
                 else:
                     instructions: list[str] = self.split_instructions(info.instruction)
-                    no_transform_by_instruction = False
                     for i in instructions:
                         match i:
                             case 'max':
@@ -265,11 +266,16 @@ class Preprocessor:
                             case 'd':
                                 # drop/delete the row
                                 df = df.drop(column_name, axis=1)
-                                no_transform_by_instruction = True  # do not perform transform on this column
+                                discarded = True  # do not perform transform on this column
                             case _:
                                 raise RuntimeError(f"Invalid instruction: {i}")
-                    if not no_transform and not no_transform_by_instruction:
+                    if not no_transform and not discarded:
                         df = self.auto_transform_column(df, column_name)
+
+                if not discarded:
+                    if column_name in self.column_map:
+                        raise RuntimeError(f"Column {column_name} already exists")
+                    self.column_map[column_name] = info
 
         return df
 
@@ -466,29 +472,83 @@ class Preprocessor:
 
         return expanded_df
 
-    @staticmethod
-    def summarize_csmar_data(datas: list[CsmarData]):
-        headers = ['Series Number', 'Acronym', 'Fullname', 'Tran', 'Descriptions']
+    def summarize_csmar_data(self, datas: list[CsmarData]):
+        summary = {'Series Number': [],
+                   'Acronym': [],
+                   'Description': []}
+        stat = {
+            'Acronym': [],
+            'Obs': [],
+            'Mean': [],
+            'Max': [],
+            'Min': [],
+            'Std': [],
+            'Skew': [],
+            'Kurt': []
+        }
         count = 0
-        table_data = []
         for data in datas:
             data_sheet = data.csmar_datasheet
+
             if data_sheet.disabled:
                 continue
-            for column_info in data_sheet.column_infos:
+
+            enabled_columns = [c for c in data_sheet.column_infos if c.enabled]
+            if len(enabled_columns) == 0:
+                continue
+
+            df = self.load_normalized_csmar_data([data], no_transform=True)
+            _, g_name = self.detect_granularity(df.columns)
+            column_infos = [self.column_map[c] for c in df.columns if c != g_name]  # we do not need to summarize date
+            # do not use the infos in the data sheet since some column may be discarded according to loading strategy
+            for column_info in column_infos:
                 if not column_info.enabled:
                     continue
+
                 number = count + 1  # begin with 1
+                summary['Series Number'].append(number)
                 count += 1
 
                 acronym = column_info.column_name
-                fullname = column_info.full_name
-                tran = Translation.DELTA.value
-                description = column_info.full_name + column_info.explanation
+                summary['Acronym'].append(acronym)
+                description = column_info.full_name  # let's treat full name as description
+                summary['Description'].append(description)
 
-                table_data.append([number, acronym, fullname, tran, description])
-        tab = tabulate(table_data, headers=headers)
-        print(tab)
+                stat['Acronym'].append(acronym)
+
+                obs = len(df)
+                stat['Obs'].append(obs)
+
+                mean = df[column_info.column_name].mean()
+                stat['Mean'].append(mean)
+
+                max_val = df[column_info.column_name].max()
+                stat['Max'].append(max_val)
+
+                min_val = df[column_info.column_name].min()
+                stat['Min'].append(min_val)
+
+                std = df[column_info.column_name].std()
+                stat['Std'].append(std)
+
+                skew = df[column_info.column_name].skew()
+                stat['Skew'].append(skew)
+
+                kurt = df[column_info.column_name].kurt()
+                stat['Kurt'].append(kurt)
+
+        summary_df = pd.DataFrame(summary)
+        stat_df = pd.DataFrame(stat)
+
+        summary_s = summary_df.to_string(index=False)
+        stat_s = stat_df.to_string(index=False)
+        print(summary_s)
+        print()
+        print(stat_s)
+
+        with pd.ExcelWriter('../out/data_stat.xlsx') as writer:
+            summary_df.to_excel(writer, sheet_name='description', index=False)
+            stat_df.to_excel(writer, sheet_name='statistics', index=False)
 
     @staticmethod
     def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \
@@ -629,4 +689,5 @@ if __name__ == "__main__":
     config = DataConfig(DataConfigLayout(Path('./config/data')))
     config.auto_config(r'/Users/a/playground/freestyle/')
     preprocessor = Preprocessor(StockLoadingStrategy())
-    preprocessor.load_normalized_csmar_data(config.derived_csmar_datas, no_transform=True)
+    # preprocessor.load_normalized_csmar_data(config.derived_csmar_datas, no_transform=True)
+    preprocessor.summarize_csmar_data(config.derived_csmar_datas)
