@@ -103,8 +103,8 @@ class Preprocessor:
     def __init__(self, strategy: LoadingStrategy):
         self.strategy = strategy
         self.granularity_dic = {
-            Granularity.YEARLY: ['Sgnyea'],
-            Granularity.MONTHLY: ['Staper'],
+            Granularity.YEARLY: ['Sgnyea', 'SgnYear'],
+            Granularity.MONTHLY: ['Staper', 'Sgnmnth'],
             Granularity.DAILY: ['Trddt', 'Exchdt', 'Clsdt', 'Date']
         }
         self.column_map: Dict[str: list[CsmarColumnInfo]] = {}
@@ -509,6 +509,23 @@ class Preprocessor:
             'Skew': [],
             'Kurt': []
         }
+
+        daily_data = []
+        monthly_data = []
+        yearly_data = []
+
+        for data in datas:
+            all_names = [ci.column_name for ci in data.csmar_datasheet.column_infos]
+            g, _ = self.detect_granularity(all_names)
+            match g:
+                case Granularity.DAILY:
+                    daily_data.append(data)
+                case Granularity.MONTHLY:
+                    monthly_data.append(data)
+                case Granularity.YEARLY:
+                    yearly_data.append(data)
+                case _:
+                    raise RuntimeError('Unknown granularity')
 
         anchor = None
         for data in datas:
