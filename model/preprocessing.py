@@ -475,6 +475,7 @@ class Preprocessor:
     def summarize_csmar_data(self, datas: list[CsmarData]):
         summary = {'Series Number': [],
                    'Acronym': [],
+                   'Fullname': [],
                    'Description': []}
         stat = {
             'Acronym': [],
@@ -491,7 +492,8 @@ class Preprocessor:
 
         count = 0
         _, g_name = self.detect_granularity(df.columns)
-        column_infos = [self.column_map[c] for c in df.columns if c != g_name]  # we do not need to summarize date
+        column_infos: list[CsmarColumnInfo] = [self.column_map[c] for c in df.columns if
+                                               c != g_name]  # we do not need to summarize date
         # do not use the infos in the data sheet since some column may be discarded according to loading strategy
         for column_info in column_infos:
             if not column_info.enabled:
@@ -503,7 +505,9 @@ class Preprocessor:
 
             acronym = column_info.column_name
             summary['Acronym'].append(acronym)
-            description = column_info.full_name  # let's treat full name as description
+            fullname = column_info.full_name
+            summary['Fullname'].append(fullname)
+            description = column_info.explanation  # let's treat full name as description
             summary['Description'].append(description)
 
             stat['Acronym'].append(acronym)
