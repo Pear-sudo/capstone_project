@@ -184,21 +184,25 @@ class Preprocessor:
                                       all_column_names=all_column_names)
 
             # null safety check
-            if df is None:
+            if df is None or len(df) == 0:
                 logger.warning(f'Skipping {data_path} because pd loaded without data')
                 continue
+
+            # drop the column whose value is all nan
+            df.dropna(axis=1, how="all", inplace=True)
 
             # filter the data:
             columns_to_filter = [info for info in enabled_columns if info.filter.strip() != '']
             for info in columns_to_filter:
                 # split the filter's instructions
                 fs: list[str] = [f.strip() for f in info.filter.strip().split(',')]
-                if not fs[0] in string.ascii_letters:
+                sample = fs[0][0]
+                if sample not in string.ascii_letters:
                     fs_series = pd.Series(fs).astype(int)
                 else:
                     fs_series = pd.Series(fs)
                 df = df[df[info.column_name].isin(fs_series)]
-                if fs[0] in string.ascii_letters:
+                if sample in string.ascii_letters:
                     df.drop(info.column_name, axis=1, inplace=True)
                     enabled_columns.remove(info)
 
@@ -579,8 +583,15 @@ class Preprocessor:
                         for token in tokens:
                             kv = token.split('=')
                             k = kv[0].strip()
-                            if k == 'JYP':
-                                k = 'JPY'
+                            match k:
+                                case 'JYP':
+                                    k = 'JPY'
+                                case 'S':
+                                    k = '1'
+                                case 'U':
+                                    k = '2'
+                                case 'R':
+                                    k = '3'
                             v = kv[1].strip()
                             token_dic[k] = v
                     elif ':' in foreign_explanation:
@@ -627,8 +638,8 @@ class Preprocessor:
 
             return df
 
-        dd = _summarize_csmar_data(daily_data)
-        # dm = _summarize_csmar_data(monthly_data)
+        # dd = _summarize_csmar_data(daily_data)
+        dm = _summarize_csmar_data(monthly_data)
         # dy = _summarize_csmar_data(yearly_data)
 
         summary_df = pd.DataFrame(summary)
