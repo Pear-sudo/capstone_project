@@ -254,8 +254,9 @@ class DataConfig:
             return
         last_backup = latest_file(self.layout.backup.iterdir())
         if last_backup is None:
-            return
-        old_hash = hash_file(last_backup)
+            old_hash = ''
+        else:
+            old_hash = hash_file(last_backup)
 
         output_path = self.layout.backup.joinpath(make_timestamp() + '.zip')
         exclude = [self.layout.backup]
