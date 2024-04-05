@@ -921,6 +921,37 @@ def split_data():
                 df_tmp.to_csv(new_path, index=False)
 
 
+def interpolate_monthly():
+    paths = [
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_monthly_filled_test.csv'),
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_monthly_filled_train.csv'),
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_monthly_filled_val.csv')
+    ]
+    preprocessor = Preprocessor(StockLoadingStrategy())
+    for path in paths:
+        if path.exists():
+            df = pd.read_csv(path)
+            granularity_col_name: str = preprocessor.detect_granularity(df.columns)[1]
+            df[granularity_col_name] = pd.to_datetime(df[granularity_col_name])
+            df.set_index(granularity_col_name, inplace=True)
+
+            last_date = df.index.max()
+            target_date = last_date + pd.offsets.MonthEnd(1)
+            # df = df.resample('D').asfreq() cannot extend to the last day of the last month
+            df = df.reindex(df.index.union(pd.date_range(last_date + pd.Timedelta(days=1), target_date)))
+
+            df = df.interpolate(method='linear')
+
+            parent = path.parent
+            stem = path.stem
+            suffix = path.suffix
+            new_stem = stem + '_interpolated'
+            new_path = parent.joinpath(new_stem + suffix)
+
+            df.index.name = 'Date'  # so that the data can be later merged correctly
+            df.to_csv(new_path)  # you need the index here since it is the date column
+
+
 def normalize_data():
     """
     Hard-wire the normalization code to split data; sorry,
@@ -938,4 +969,4 @@ def merge_data():
 
 
 if __name__ == "__main__":
-    merge_data()
+    interpolate_monthly()
