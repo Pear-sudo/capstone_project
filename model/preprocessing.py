@@ -1011,7 +1011,7 @@ def extract_time_signal():
     preprocessor = Preprocessor(StockLoadingStrategy())
 
     for t in types:
-        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/merge/{t}.csv')
+        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/{t}_nosig.csv')
         if not path.exists():
             continue
 
@@ -1031,7 +1031,7 @@ def extract_time_signal():
         df['Month_sin'] = np.sin(df_month * (2. * np.pi / 12.))
         df['Month_cos'] = np.cos(df_month * (2. * np.pi / 12.))
 
-        df.to_csv(out_dir.joinpath(f'{t}_signaled.csv'), index=False)
+        df.to_csv(out_dir.joinpath(f'{t}.csv'), index=False)
 
 
 def normalize_data():
@@ -1052,7 +1052,7 @@ def normalize_data():
     preprocessor = Preprocessor(StockLoadingStrategy())
 
     for t in types:
-        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/{t}_signaled.csv')
+        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/merge/{t}.csv')
         if not path.exists():
             continue
         df = pd.read_csv(path)
@@ -1062,7 +1062,7 @@ def normalize_data():
         df = df.dropna()
         df = df.apply(zscore)
 
-        df.to_csv(out_dir.joinpath(f'{t}.csv'))
+        df.to_csv(out_dir.joinpath(f'{t}_nosig.csv'))
 
 
 def all_in_one():
@@ -1070,9 +1070,9 @@ def all_in_one():
     split_data()
     interpolate_monthly()
     merge_data()
-    extract_time_signal()
     normalize_data()
+    extract_time_signal()
 
 
 if __name__ == "__main__":
-    normalize_data()
+    extract_time_signal()
