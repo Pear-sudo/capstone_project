@@ -953,6 +953,12 @@ def interpolate_monthly():
             df.to_csv(new_path)  # you need the index here since it is the date column
 
 
+def merge_data():
+    out_dir = Path('../out/merge')
+    if not out_dir.exists():
+        out_dir.mkdir()
+
+
 def normalize_data():
     """
     Hard-wire the normalization code to split data; sorry,
@@ -961,12 +967,6 @@ def normalize_data():
     :return:
     """
     pass
-
-
-def merge_data():
-    out_dir = Path('../out/merge')
-    if not out_dir.exists():
-        out_dir.mkdir()
 
 
 def all_in_one():
