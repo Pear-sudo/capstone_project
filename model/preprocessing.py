@@ -880,5 +880,45 @@ def forward_fill():
             df.to_csv(new_path, index=False)
 
 
+def split_data():
+    # split to 7:2:1
+    # if you take monthly data into consideration and rounded: 12*4/10=4.8;
+    # months 34,9,5
+    months_alloc = [0, 34, 9, 5]  # 0 is solely for programming purpose
+    alloc_cum = np.cumsum(months_alloc)
+    types = [
+        'train',
+        'val',
+        'test'
+    ]
+    paths = [
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_daily_filled.csv'),
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_monthly_filled.csv'),
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled.csv')
+    ]
+    preprocessor = Preprocessor(StockLoadingStrategy())
+    temporary_date_column_name = 'date_column_DF2ABBF3'
+    base = pd.Timestamp(year=2020, month=1, day=1)
+    for path in paths:
+        if path.exists():
+            df = pd.read_csv(path)
+            granularity_col_name: str = preprocessor.detect_granularity(df.columns)[1]
+            df[temporary_date_column_name] = pd.to_datetime(df[granularity_col_name])
+            for i in range(3):
+                shift_b = int(alloc_cum[i])
+                shift_e = int(alloc_cum[i + 1])
+                begin = base + pd.offsets.MonthBegin(shift_b)
+                end = base + pd.offsets.MonthEnd(shift_e)
+                df_tmp = df[(df[temporary_date_column_name] >= begin) & (df[temporary_date_column_name] <= end)]
+
+                parent = path.parent
+                stem = path.stem
+                suffix = path.suffix
+                new_stem = stem + f'_{types[i]}'
+                new_path = parent.joinpath(new_stem + suffix)
+
+                df_tmp.to_csv(new_path, index=False)
+
+
 if __name__ == "__main__":
-    forward_fill()
+    split_data()
