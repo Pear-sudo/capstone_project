@@ -920,5 +920,11 @@ def split_data():
                 df_tmp.to_csv(new_path, index=False)
 
 
+def merge_data():
+    out_dir = Path('../out/merge')
+    if not out_dir.exists():
+        out_dir.mkdir()
+
+
 if __name__ == "__main__":
-    split_data()
+    merge_data()
