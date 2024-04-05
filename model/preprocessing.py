@@ -999,6 +999,41 @@ def merge_data():
         df_combined.to_csv(output_path, index=False)
 
 
+def extract_time_signal():
+    out_dir = Path('/Users/a/PycharmProjects/capstone/capstone project/out')
+
+    types = [
+        'train',
+        'val',
+        'test'
+    ]
+
+    preprocessor = Preprocessor(StockLoadingStrategy())
+
+    for t in types:
+        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/merge/{t}.csv')
+        if not path.exists():
+            continue
+
+        df = pd.read_csv(path)
+        granularity_col_name: str = preprocessor.detect_granularity(df.columns)[1]
+        df_dt = pd.to_datetime(df[granularity_col_name])
+
+        df_weekday = df_dt.dt.weekday
+        if not df_weekday.between(0, 6).all():
+            raise RuntimeError('Weekday not between 0 and 6')
+        df['Week_sin'] = np.sin(df_weekday * (2. * np.pi / 7.))
+        df['Week_cos'] = np.cos(df_weekday * (2. * np.pi / 7.))
+
+        df_month = df_dt.dt.month
+        if not df_month.between(1, 12).all():
+            raise RuntimeError('Month not between 1 and 12')
+        df['Month_sin'] = np.sin(df_month * (2. * np.pi / 12.))
+        df['Month_cos'] = np.cos(df_month * (2. * np.pi / 12.))
+
+        df.to_csv(out_dir.joinpath(f'{t}_signaled.csv'), index=False)
+
+
 def normalize_data():
     """
     Hard-wire the normalization code to split data; sorry,
@@ -1017,7 +1052,7 @@ def normalize_data():
     preprocessor = Preprocessor(StockLoadingStrategy())
 
     for t in types:
-        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/merge/{t}.csv')
+        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/{t}_signaled.csv')
         if not path.exists():
             continue
         df = pd.read_csv(path)
@@ -1035,6 +1070,8 @@ def all_in_one():
     split_data()
     interpolate_monthly()
     merge_data()
+    extract_time_signal()
+    normalize_data()
 
 
 if __name__ == "__main__":
