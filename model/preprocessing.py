@@ -862,5 +862,23 @@ def test_stock_number() -> list | None:
     return None
 
 
+def forward_fill():
+    paths = [
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily.csv'),
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_daily.csv'),
+        Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_monthly.csv')
+    ]
+    for path in paths:
+        if path.exists():
+            df = pd.read_csv(path)
+            df.ffill()
+            parent = path.parent
+            stem = path.stem
+            suffix = path.suffix
+            new_stem = stem + '_filled'
+            new_path = parent.joinpath(new_stem + suffix)
+            df.to_csv(new_path, index=False)
+
+
 if __name__ == "__main__":
-    test_stock_number()
+    forward_fill()
