@@ -1,5 +1,8 @@
 *.ipynb
 *.xlsx
+*.zip
+*.yaml
+*.csv
 
 **/data/**/*.csv
 model/config/data/**
