@@ -910,6 +910,7 @@ def split_data():
                 begin = base + pd.offsets.MonthBegin(shift_b)
                 end = base + pd.offsets.MonthEnd(shift_e)
                 df_tmp = df[(df[temporary_date_column_name] >= begin) & (df[temporary_date_column_name] <= end)]
+                df_tmp.drop(temporary_date_column_name, axis=1, inplace=True)
 
                 parent = path.parent
                 stem = path.stem
