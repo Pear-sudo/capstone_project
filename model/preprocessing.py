@@ -962,6 +962,41 @@ def merge_data():
     if not out_dir.exists():
         out_dir.mkdir()
 
+    types = [
+        'train',
+        'val',
+        'test'
+    ]
+
+    preprocessor = Preprocessor(StockLoadingStrategy())
+
+    for t in types:
+        parent_path = Path('/Users/a/PycharmProjects/capstone/capstone project/out/macro')
+        daily_temp = 'raw_data_daily_filled_{}.csv'
+        monthly_temp = 'raw_data_monthly_filled_{}_interpolated.csv'
+        daily_path = parent_path.joinpath(daily_temp.format(t))
+        monthly_path = parent_path.joinpath(monthly_temp.format(t))
+        if not daily_path.exists() and not monthly_path.exists():
+            continue
+        output_path = out_dir.joinpath(f'macro_{t}.csv')
+        df_d = pd.read_csv(daily_path)
+        df_m = pd.read_csv(monthly_path)
+        df_combined = preprocessor.combine_dataframes(df_d, df_m, fill=False, left_join=True)
+        df_combined.to_csv(output_path, index=False)
+
+    del df_d, df_m, df_combined
+
+    for t in types:
+        stock_path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_{t}.csv')
+        macro_path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/merge/macro_{t}.csv')
+        if not stock_path.exists() and not macro_path.exists():
+            continue
+        output_path = out_dir.joinpath(f'{t}.csv')
+        df_s = pd.read_csv(stock_path)
+        df_m = pd.read_csv(macro_path)
+        df_combined = preprocessor.combine_dataframes(df_s, df_m, fill=False, left_join=True)
+        df_combined.to_csv(output_path, index=False)
+
 
 def normalize_data():
     """
@@ -977,7 +1012,8 @@ def all_in_one():
     forward_backward_fill()
     split_data()
     interpolate_monthly()
+    merge_data()
 
 
 if __name__ == "__main__":
-    interpolate_monthly()
+    merge_data()
