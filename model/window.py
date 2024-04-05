@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os.path
+from pathlib import Path
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -10,6 +11,7 @@ import tensorflow as tf
 from keras import Model
 from pandas import DataFrame
 
+from model.config import DataConfig, DataConfigLayout
 from model.preprocessing import Preprocessor, StockLoadingStrategy
 from model.stocks import StockColumn
 
@@ -154,7 +156,34 @@ class WindowGenerator:
         At the price of losing some generalizability, this function loads the data needed by the coursework
         :return:
         """
-        pass
+        self.is_mixed_dataset = False  # make sure we are using a single dataset to generate windows
+
+        # make sure yaml confi files are handled properly
+        config = DataConfig(DataConfigLayout(Path('./config/data')))
+        config.auto_config(r'/Users/a/playground/freestyle/')
+
+        # load data that is not directly available in /data/raw/stocks;
+        # in other words, the data that are not directly linked to a specific stock
+        background_data = self.preprocessor.load_normalized_csmar_data(config.derived_csmar_datas)
+
+        # the logic here is to train each model individually on each stock, ignoring all other stocks
+        # 1. these 300 stocks share a very short common period,
+        # making training them altogether a very bad idea
+        # 2. if I divide each stock into train, validation and test and then combine them,
+        # as import_from_directory() does,
+        # this gives rise to two problems:
+        # a) the data is leaked in the training phrases since different stocks have different durations
+        # and thus different train segments spanning various timelines
+        # b) it adds the complexity to train the model to distinguish different stocks,
+        # note it's not a good idea to use dummy variables since there are 300 stocks to distinguish
+        # 3. I also choose not to include same period stocks when training on each stock for reasons that have been
+        # mentioned above: their durations vary and the model's input and output tensors are fixed sized;
+        #  and the index is representative enough
+        # 4. this makes the analysis of ML performance of different stocks more convenient
+        # as the model no longer needs to sacrifice some stocks' performance for the overall performance
+
+
+
 
     @staticmethod
     def check_features(features: list[int]):

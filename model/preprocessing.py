@@ -500,7 +500,7 @@ class Preprocessor:
 
         return expanded_df
 
-    def summarize_csmar_data(self, datas: list[CsmarData]):
+    def summarize_csmar_data(self, datas: list[CsmarData], output_dir: str = 'default'):
         summary = {'Series Number': [],
                    'Frequency': [],
                    'Acronym': [],
@@ -661,15 +661,17 @@ class Preprocessor:
         print()
         print(stat_s)
 
-        with pd.ExcelWriter('../out/data_stat.xlsx') as writer:
+        out_path = Path(f'../out/{output_dir}')
+        if not out_path.exists():
+            out_path.mkdir()
+        with pd.ExcelWriter(out_path.joinpath('data_stat.xlsx')) as writer:
             summary_df.to_excel(writer, sheet_name='description', index=False)
             stat_df.to_excel(writer, sheet_name='statistics', index=False)
 
-        with pd.ExcelWriter('../out/raw_data.xlsx') as writer:
+        with pd.ExcelWriter(out_path.joinpath('raw_data.xlsx')) as writer:
             dd.to_excel(writer, sheet_name='daily', index=False)
-            dm.to_excel(writer, sheet_name='monthly', index=False)
-
-
+            if dm is not None:
+                dm.to_excel(writer, sheet_name='monthly', index=False)
 
     @staticmethod
     def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \
@@ -806,9 +808,20 @@ class Preprocessor:
         return train, val, test
 
 
-if __name__ == "__main__":
+def test_macro_var_preprocessing():
     config = DataConfig(DataConfigLayout(Path('./config/data')))
     config.auto_config(r'/Users/a/playground/freestyle/')
     preprocessor = Preprocessor(StockLoadingStrategy())
     # preprocessor.load_normalized_csmar_data(config.derived_csmar_datas, no_transform=True)
-    preprocessor.summarize_csmar_data(config.derived_csmar_datas)
+    preprocessor.summarize_csmar_data(config.derived_csmar_datas, output_dir='macro')
+
+
+def test_stock_var_preprocessing():
+    config = DataConfig(DataConfigLayout(Path('./config/stock')))
+    config.auto_config(r'/Users/a/playground/stock_data')
+    preprocessor = Preprocessor(StockLoadingStrategy())
+    preprocessor.summarize_csmar_data(config.derived_csmar_datas, output_dir='stock')
+
+
+if __name__ == "__main__":
+    test_stock_var_preprocessing()
