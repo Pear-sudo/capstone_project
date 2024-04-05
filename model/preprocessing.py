@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
+from model import loader
 from model.config import DataConfig, DataConfigLayout
 from model.loader import CsmarData, CsmarColumnInfo
 
@@ -51,7 +52,7 @@ class LoadingStrategy:
 
 
 class StockLoadingStrategy(LoadingStrategy):
-    def __init__(self):
+    def __init__(self, stock_ids_path: Path | None = None):
         super().__init__()
         self.conditions = {
             "trdsta": 1,
@@ -66,6 +67,13 @@ class StockLoadingStrategy(LoadingStrategy):
 
         self.beginning_year = 2020
         self.ending_year = 2023
+
+        self.stock_ids_path = stock_ids_path
+        self.enabled_stock_ids: list[str] = []
+        if self.stock_ids_path is not None:
+            df = pd.read_csv(self.stock_ids_path, header=None)
+            s: pd.Series = df.iloc[:, 0]
+            self.enabled_stock_ids = s.tolist()
 
 
 class Normalizer:
@@ -100,7 +108,7 @@ class Granularity(Enum):
 
 
 class Preprocessor:
-    def __init__(self, strategy: LoadingStrategy):
+    def __init__(self, strategy: StockLoadingStrategy):
         self.strategy = strategy
         self.granularity_dic = {
             Granularity.YEARLY: ['Sgnyea', 'SgnYear'],
@@ -148,6 +156,10 @@ class Preprocessor:
                                    f"expected {len(enabled_column_names)}, "
                                    f"loaded {len(df.columns)}")
             logger.debug(f"Read {len(df.columns)} columns from {path}:\n{df.columns}")
+
+        # drop unselected stocks
+        if self.strategy.stock_ids_path is not None:
+            df = df[df['Stkcd'].isin(self.strategy.enabled_stock_ids)]
 
         # only select data within the date range
         temporary_date_column_name = 'date_column_DF2ABBF3'
@@ -672,6 +684,10 @@ class Preprocessor:
             dd.to_excel(writer, sheet_name='daily', index=False)
             if dm is not None:
                 dm.to_excel(writer, sheet_name='monthly', index=False)
+        dd: pd.DataFrame
+        dd.to_csv(out_path.joinpath('raw_data_daily.csv'), index=False)
+        if dm is not None:
+            dm.to_csv(out_path.joinpath('raw_data_monthly.csv'), index=False)
 
     @staticmethod
     def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \
@@ -819,9 +835,32 @@ def test_macro_var_preprocessing():
 def test_stock_var_preprocessing():
     config = DataConfig(DataConfigLayout(Path('./config/stock')))
     config.auto_config(r'/Users/a/playground/stock_data')
-    preprocessor = Preprocessor(StockLoadingStrategy())
+    preprocessor = Preprocessor(StockLoadingStrategy(stock_ids_path=Path(
+        r'/Users/a/PycharmProjects/capstone/capstone project/data/selection/ids.csv')))
     preprocessor.summarize_csmar_data(config.derived_csmar_datas, output_dir='stock')
 
 
-if __name__ == "__main__":
+def test_stock_macro():
+    test_macro_var_preprocessing()
     test_stock_var_preprocessing()
+
+
+def test_stock_number() -> list | None:
+    ids = []
+    path = Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily.csv')
+    if path.exists():
+        h = loader.head(path, 1)[0]
+        names = h.split(',')
+        names.remove('Date')
+        for name in names:
+            i = name.split('_')[1]
+            ids.append(i)
+        unique = set(ids)
+        count = len(unique)
+        print(f'Number of ids: {count}')
+        return list(unique)
+    return None
+
+
+if __name__ == "__main__":
+    test_stock_number()
