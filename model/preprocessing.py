@@ -9,6 +9,7 @@ from typing import Any, Mapping, Optional, Dict
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
+from scipy.stats import zscore
 
 from model import loader
 from model.config import DataConfig, DataConfigLayout
@@ -1005,7 +1006,28 @@ def normalize_data():
     and my project ddl is approaching
     :return:
     """
-    pass
+    out_dir = Path('/Users/a/PycharmProjects/capstone/capstone project/out')
+
+    types = [
+        'train',
+        'val',
+        'test'
+    ]
+
+    preprocessor = Preprocessor(StockLoadingStrategy())
+
+    for t in types:
+        path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/out/merge/{t}.csv')
+        if not path.exists():
+            continue
+        df = pd.read_csv(path)
+        granularity_col_name: str = preprocessor.detect_granularity(df.columns)[1]
+        df.set_index(granularity_col_name, inplace=True)
+        df = df.diff()
+        df = df.dropna()
+        df = df.apply(zscore)
+
+        df.to_csv(out_dir.joinpath(f'{t}.csv'))
 
 
 def all_in_one():
@@ -1016,4 +1038,4 @@ def all_in_one():
 
 
 if __name__ == "__main__":
-    merge_data()
+    normalize_data()
