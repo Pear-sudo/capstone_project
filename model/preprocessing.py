@@ -920,6 +920,16 @@ def split_data():
                 df_tmp.to_csv(new_path, index=False)
 
 
+def normalize_data():
+    """
+    Hard-wire the normalization code to split data; sorry,
+    I know this is not DRY, but the project is too large to maintain
+    and my project ddl is approaching
+    :return:
+    """
+    pass
+
+
 def merge_data():
     out_dir = Path('../out/merge')
     if not out_dir.exists():
