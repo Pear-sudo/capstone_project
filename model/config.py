@@ -35,6 +35,14 @@ class DataConfigLayout:
         self.ignored: Path = self.root.joinpath(self.ignored)
         self.backup: Path = self.root.joinpath(self.backup)
 
+    def make_missing_dir(self):
+        for _, v in self.__dict__.items():
+            if not isinstance(v, Path):
+                continue
+            v: Path
+            if not v.exists():
+                v.mkdir(parents=True, exist_ok=False)
+
 
 def make_layout(layout: DataConfigLayout):
     root: Path = layout.__dict__['root']
@@ -235,6 +243,8 @@ class DataConfig:
             legitimate_dirs = self.layout.__dict__.values()
             if p not in legitimate_dirs:
                 raise_error(p)
+
+        self.layout.make_missing_dir()
 
         iter_dir(self.layout.root, if_file(self.unconfigured), if_dir, raise_error)
 
