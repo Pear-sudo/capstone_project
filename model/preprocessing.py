@@ -665,6 +665,12 @@ class Preprocessor:
             summary_df.to_excel(writer, sheet_name='description', index=False)
             stat_df.to_excel(writer, sheet_name='statistics', index=False)
 
+        with pd.ExcelWriter('../out/raw_data.xlsx') as writer:
+            dd.to_excel(writer, sheet_name='daily', index=False)
+            dm.to_excel(writer, sheet_name='monthly', index=False)
+
+
+
     @staticmethod
     def split_to_dataframes(df: pd.DataFrame, ratio: tuple[float, float, float] = (0.7, 0.2, 0.1)) \
             -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
