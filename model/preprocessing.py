@@ -104,7 +104,7 @@ class Preprocessor:
         self.strategy = strategy
         self.granularity_dic = {
             Granularity.YEARLY: ['Sgnyea', 'SgnYear'],
-            Granularity.MONTHLY: ['Staper', 'Sgnmnth'],
+            Granularity.MONTHLY: ['Staper', 'Sgnmnth', 'Month'],
             Granularity.DAILY: ['Trddt', 'Exchdt', 'Clsdt', 'Date']
         }
         self.column_map: Dict[str: list[CsmarColumnInfo]] = {}
