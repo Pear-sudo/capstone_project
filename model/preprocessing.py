@@ -862,7 +862,7 @@ def test_stock_number() -> list | None:
     return None
 
 
-def forward_fill():
+def forward_backward_fill():
     paths = [
         Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily.csv'),
         Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_daily.csv'),
@@ -871,7 +871,8 @@ def forward_fill():
     for path in paths:
         if path.exists():
             df = pd.read_csv(path)
-            df.ffill()
+            df = df.ffill()
+            df = df.bfill()
             parent = path.parent
             stem = path.stem
             suffix = path.suffix
@@ -968,5 +969,11 @@ def merge_data():
         out_dir.mkdir()
 
 
-if __name__ == "__main__":
+def all_in_one():
+    forward_backward_fill()
+    split_data()
     interpolate_monthly()
+
+
+if __name__ == "__main__":
+    all_in_one()
