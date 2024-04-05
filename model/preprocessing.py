@@ -936,10 +936,14 @@ def interpolate_monthly():
             df[granularity_col_name] = pd.to_datetime(df[granularity_col_name])
             df.set_index(granularity_col_name, inplace=True)
 
+            df = df.resample('D').asfreq()
+
             last_date = df.index.max()
-            target_date = last_date + pd.offsets.MonthEnd(1)
-            # df = df.resample('D').asfreq() cannot extend to the last day of the last month
-            df = df.reindex(df.index.union(pd.date_range(last_date + pd.Timedelta(days=1), target_date)))
+            end_of_last_month = last_date + pd.offsets.MonthEnd(1)
+            if last_date < end_of_last_month:
+                # Create a date range for the missing days and append it to the DataFrame's index
+                extra_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), end=end_of_last_month, freq='D')
+                df = df.reindex(df.index.union(extra_dates))
 
             df = df.interpolate(method='linear')
 
@@ -976,4 +980,4 @@ def all_in_one():
 
 
 if __name__ == "__main__":
-    all_in_one()
+    interpolate_monthly()
