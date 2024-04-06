@@ -9,7 +9,6 @@ import tensorflow as tf
 from sklearn.metrics import r2_score
 
 from model.loader import head
-from model.networks.cnn import get_cnn
 from model.networks.dense import get_dense
 from model.preprocessing import Preprocessor, StockLoadingStrategy, test_stock_number
 from model.window import WindowGenerator
@@ -18,7 +17,7 @@ from model.window import WindowGenerator
 This module groups training related functions.
 """
 
-MAX_EPOCHS = 3
+MAX_EPOCHS = 100
 PATIENCE = 10
 
 out_dir: Path = Path('../../out/training')
@@ -30,7 +29,7 @@ def get_all_models() -> dict[str, tf.keras.models.Sequential]:
     # d dropout; c cnn; n neural network
     d = {
         'n': get_dense(),
-        'c': get_cnn(),
+        # 'c': get_cnn(),
         # 'linear': get_liner(),
     }
     return d
@@ -45,10 +44,10 @@ def extract_labels_predictions(model, window: WindowGenerator) -> tuple[list, li
     """
     predictions = list(model.predict(window.test).flatten())
     true_values = []
-    # input_values = []
+    input_values = []
     for inputs, labels in window.test:
         true_values.extend(labels.numpy().flatten())
-        # input_values.append(list(inputs.numpy().reshape(inputs.shape[0], -1)))
+        input_values.append(inputs.numpy())
     return true_values, predictions
 
 
@@ -91,10 +90,11 @@ def compile_and_fit(model: tf.keras.Model,
                                                             monitor='val_loss',
                                                             mode='min'))
 
+    learning_rate = 0.001
     if platform.system() == "Darwin" and platform.processor() == "arm":
-        opt = tf.keras.optimizers.legacy.Adam()
+        opt = tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
     else:
-        opt = tf.keras.optimizers.Adam()
+        opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
     model.compile(loss=tf.keras.losses.MeanSquaredError(),
                   optimizer=opt,
@@ -209,32 +209,85 @@ def altogether():
 
 
 def individually():
+    input_width = 7
+    conv_width = 3
+
+    check_dir = Path('../checkpoints/main')
+
+    macros_all = (head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/merge/macro_test.csv'), 1)[0]
+                  .split(','))
+    macros_all.remove('Date')
+
+    macros_daily = \
+        head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_daily_filled_test.csv'), 1)[
+            0].split(',')
+    macros_daily.remove('Date')
+
     closing_price_label = 'Clsprc'
-
-    macros = (head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/merge/macro_test.csv'), 1)[0]
-              .split(','))
-    macros.remove('Date')
-
     stock_level_dict = get_stock_level_dict()
-    labels = get_labels()
+    stock_all = []
+    for v in stock_level_dict.values():
+        stock_all.extend(v)
 
     train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
     val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
     test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_train.csv')
+    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_val.csv')
+    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_test.csv')
 
-    i = '2'
-    single = [f'{closing_price_label}_{i}']
-    train_i = train[macros + stock_level_dict[i]]
-    val_i = val[macros + stock_level_dict[i]]
-    test_i = test[macros + stock_level_dict[i]]
+    for model_name, model in get_all_models().items():
 
-    window = WindowGenerator(1, 1, 1, single,
-                             train_df=train_i, val_df=val_i, test_df=test_i)
+        print(f'Training model {model_name}')
+        check_path_model = check_dir.joinpath(model_name)
 
-    dense = get_dense()
+        for stock_id, stock_vars in stock_level_dict.items():
+            id_str = '{:06}'.format(stock_id)
+            print(f'Training stock {id_str} using {model_name}')
 
-    compile_and_fit(dense, window, seed=0, patience=10)
+            check_path_model_stock = check_path_model.joinpath(id_str)
+            target_label = f'{closing_price_label}_{stock_id}'
+
+            selectors = stock_vars + macros_all
+            # selectors = stock_vars
+
+            train_i = train[selectors]
+            val_i = val[selectors]
+            test_i = test[selectors]
+
+            # check_path_model_stock = Path('../checkpoints/testing')
+            # data_path = Path('../../out/test/testing_data.csv')
+            #
+            # data_df = pd.read_csv(data_path)
+            # preprocessor = Preprocessor(StockLoadingStrategy())
+            # train, val, test = preprocessor.split_to_dataframes(data_df)
+            #
+            # train_i = train
+            # val_i = val
+            # test_i = train
+            # target_label = 'x'
+
+            if 'c' in model_name:
+                window = WindowGenerator(input_width,
+                                         get_input_label_width_cnn(input_width, conv_width)[1],
+                                         1,
+                                         [target_label],
+                                         train_df=train_i, val_df=val_i, test_df=test_i)
+            else:
+                window = WindowGenerator(input_width,
+                                         1,
+                                         1,
+                                         [target_label],
+                                         train_df=train_i, val_df=val_i, test_df=test_i)
+
+            compile_and_fit(model, window, seed=0, patience=10, model_save_path=check_path_model_stock)
+            model_trained: tf.keras.models.Sequential = load_model(check_path_model_stock)  # load the best
+
+            r = calculate_r2_score(*extract_labels_predictions(model_trained, window))
+            print(f'R score: {r}')
+
+            exit(0)
 
 
 if __name__ == '__main__':
-    train_test_data()
+    individually()
