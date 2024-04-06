@@ -16,7 +16,7 @@ def generate_testing_data() -> pd.DataFrame:
     # y = np.power(a, 2) + np.power(b, 2) + np.power(c, 3)
     # z = a * b + np.log(c)
 
-    x = a - 3 * b + np.power(c, 2)
+    x = np.sin(np.exp(a)) * 12 - 3 * b * (a - 6) + np.power(c, 2)
 
     x = np.roll(x, 1)
 

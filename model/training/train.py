@@ -18,7 +18,7 @@ from model.window import WindowGenerator
 This module groups training related functions.
 """
 
-MAX_EPOCHS = 1000
+MAX_EPOCHS = 100
 PATIENCE = 10
 
 out_dir: Path = Path('../../out/training')
@@ -28,8 +28,8 @@ if not out_dir.exists():
 
 def get_all_models() -> dict[str, tf.keras.models.Sequential]:
     d = {
-        'linear': get_liner(),
         'dense': get_dense(),
+        'linear': get_liner(),
     }
     return d
 
@@ -115,18 +115,16 @@ def train_test_data():
     window = WindowGenerator(1, 1, 1, ['x'],
                              train_df=train, val_df=val, test_df=test)
 
-    # val = window.val
-    # inputs, labels = next(iter(val))
+    for model_name, model in get_all_models().items():
+        print(f'Training model {model_name}')
+        check_path = check_dir.joinpath(model_name)
 
-    dense = get_dense()
-    check_path = check_dir.joinpath('dense')
+        model_trained = compile_and_fit(model, window, seed=0, model_save_path=check_path)
 
-    model = compile_and_fit(dense, window, seed=0, model_save_path=check_path)
-
-    model_path = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/testing/dense')
-    model: tf.keras.models.Sequential = load_model(model_path)
-    r = calculate_r2_score(*extract_labels_predictions(model, window))
-    print(r)
+        model_path = Path(f'/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/testing/{model_name}')
+        model_trained: tf.keras.models.Sequential = load_model(model_path)
+        r = calculate_r2_score(*extract_labels_predictions(model_trained, window))
+        print(f'R score: {r}')
 
 
 def get_stock_level_dict() -> dict:
