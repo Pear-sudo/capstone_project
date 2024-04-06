@@ -12,9 +12,13 @@ def generate_testing_data() -> pd.DataFrame:
     b = np.random.rand(size)
     c = np.random.rand(size)
 
-    x = np.sin(a) + np.sin(b) + np.sin(c) - 2 * b
-    y = np.power(a, 2) + np.power(b, 2) + np.power(c, 3)
-    z = a * b + np.log(c)
+    # x = np.sin(a) + np.sin(b) + np.sin(c) - 2 * b
+    # y = np.power(a, 2) + np.power(b, 2) + np.power(c, 3)
+    # z = a * b + np.log(c)
+
+    x = 2 * a
+    y = 3 * b
+    z = 4 * c
 
     x = np.roll(x, -1)
     y = np.roll(y, -1)
