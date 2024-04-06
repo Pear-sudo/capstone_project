@@ -4,6 +4,8 @@
 *.yaml
 *.csv
 
+model/checkpoints/**
+
 **/data/**/*.csv
 model/config/data/**
 

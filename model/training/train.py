@@ -28,7 +28,8 @@ def compile_and_fit(model: tf.keras.Model,
                     window: WindowGenerator,
                     patience: int = PATIENCE,
                     max_epochs: int = MAX_EPOCHS,
-                    seed: int | None = None
+                    seed: int | None = None,
+                    model_save_path: Path | None = None,
                     ):
     if seed is not None:
         np.random.seed(seed)
@@ -36,9 +37,18 @@ def compile_and_fit(model: tf.keras.Model,
         tf.random.set_seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
 
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                      patience=patience,
-                                                      mode='min')  # for fit/training process only
+    if model_save_path and not model_save_path.exists():
+        model_save_path.mkdir(exist_ok=False, parents=True)
+
+    callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                  patience=patience,
+                                                  mode='min')]
+
+    if model_save_path:
+        callbacks.append(tf.keras.callbacks.ModelCheckpoint(str(model_save_path.absolute()),
+                                                            save_best_only=True,
+                                                            monitor='val_loss',
+                                                            mode='min'))
 
     if platform.system() == "Darwin" and platform.processor() == "arm":
         opt = tf.keras.optimizers.legacy.Adam()
@@ -51,14 +61,17 @@ def compile_and_fit(model: tf.keras.Model,
 
     history = model.fit(window.train, epochs=max_epochs,
                         validation_data=window.val,
-                        callbacks=[early_stopping])
+                        callbacks=callbacks)
+
     return history
 
 
 def train_test_data():
+    check_dir = Path('../checkpoints/testing')
     data_path = Path('../../out/test/testing_data.csv')
     if not data_path.exists():
         pass
+
     data_df = pd.read_csv(data_path)
     preprocessor = Preprocessor(StockLoadingStrategy())
     train, val, test = preprocessor.split_to_dataframes(data_df)
@@ -66,8 +79,9 @@ def train_test_data():
     window = WindowGenerator(1, 1, 1, ['z'],
                              train_df=train, val_df=val, test_df=test)
     dense = get_dense()
+    check_path = check_dir.joinpath('dense')
 
-    compile_and_fit(dense, window, seed=0)
+    compile_and_fit(dense, window, seed=0, model_save_path=check_path)
 
 
 def get_stock_level_dict() -> dict:
