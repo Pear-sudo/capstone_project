@@ -20,9 +20,9 @@ def generate_testing_data() -> pd.DataFrame:
     y = 3 * b
     z = 4 * c
 
-    x = np.roll(x, -1)
-    y = np.roll(y, -1)
-    z = np.roll(z, -1)
+    x = np.roll(x, 1)
+    y = np.roll(y, 1)
+    z = np.roll(z, 1)
 
     d = pd.DataFrame({
         'a': a,
