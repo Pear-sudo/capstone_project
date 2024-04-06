@@ -347,4 +347,6 @@ def individually(input_width: int = 7):
 
 
 if __name__ == '__main__':
-    individually()
+    size = [7, 14, 28, 48]
+    for size in size:
+        individually(size)
