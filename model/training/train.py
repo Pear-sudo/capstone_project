@@ -28,10 +28,10 @@ if not out_dir.exists():
 def calculate_r2_score(model, window: WindowGenerator):
     predictions = list(model.predict(window.test).flatten())
     true_values = []
-    # input_values = []
+    input_values = []
     for inputs, labels in window.test:
         true_values.extend(labels.numpy().flatten())
-        # input_values.append(list(inputs.numpy().reshape(inputs.shape[0], -1)))
+        input_values.append(list(inputs.numpy().reshape(inputs.shape[0], -1)))
 
     r2 = r2_score(true_values, predictions)
     return r2
@@ -107,8 +107,8 @@ def train_test_data():
 
     model_path = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/testing/dense')
     model: tf.keras.models.Sequential = load_model(model_path)
-    calculate_r2_score(model, window)
-    pass
+    r = calculate_r2_score(model, window)
+    print(r)
 
 
 def get_stock_level_dict() -> dict:

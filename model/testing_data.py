@@ -16,21 +16,15 @@ def generate_testing_data() -> pd.DataFrame:
     # y = np.power(a, 2) + np.power(b, 2) + np.power(c, 3)
     # z = a * b + np.log(c)
 
-    x = 2 * a
-    y = a * b * c
-    z = np.power(b, 2) - x * c - c
+    x = a + b + c
 
     x = np.roll(x, 1)
-    y = np.roll(y, 1)
-    z = np.roll(z, 1)
 
     d = pd.DataFrame({
         'a': a,
         'b': b,
         'c': c,
-        'x': x,
-        'y': y,
-        'z': z
+        'x': x
     })
 
     return d[:-1]

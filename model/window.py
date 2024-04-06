@@ -324,7 +324,7 @@ class WindowGenerator:
             # One window --- timepoints in each window
             # It's VERY important to know that this shuffle only impacts the first level order;
             # Time order in other levels are preserved.
-            shuffle=True,
+            shuffle=False,
             batch_size=32, )  # that's how you get the batch axis in split_window's input
 
         ds = ds.map(self.split_window)  # (batch, time, features)
