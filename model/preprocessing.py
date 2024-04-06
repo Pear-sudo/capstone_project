@@ -1076,5 +1076,28 @@ def all_in_one():
     extract_time_signal()
 
 
+def replace_with_random_data():
+    np.random.seed(0)
+    out_dir = Path('/Users/a/PycharmProjects/capstone/capstone project/out')
+    types = [
+        'train',
+        'val',
+        'test'
+    ]
+
+    ids = test_stock_number()
+    targets = []
+    for i in ids:
+        targets.append(f'Clsprc_{i}')
+
+    for t in types:
+        df = pd.read_csv(out_dir.joinpath(f'{t}.csv'))
+        row_count = df.shape[0]
+        for col in targets:
+            df[col] = np.random.normal(loc=0, scale=1, size=row_count)
+
+        df.to_csv(Path(out_dir.joinpath(f'{t}_random.csv')), index=False)
+
+
 if __name__ == "__main__":
-    extract_time_signal()
+    replace_with_random_data()
