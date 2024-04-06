@@ -1,3 +1,4 @@
+import inspect
 import os
 import platform
 import random
@@ -9,8 +10,11 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.metrics import r2_score
 
+import model.networks.cnn as cnn
+import model.networks.dense as dense
+import model.networks.linear as linear
 from model.loader import head
-from model.networks.dense import get_dense
+from model.networks.dense import n3
 from model.preprocessing import Preprocessor, StockLoadingStrategy, test_stock_number
 from model.window import WindowGenerator
 
@@ -26,10 +30,17 @@ if not out_dir.exists():
     out_dir.mkdir()
 
 
+def extract_functions_to_dict(module) -> dict:
+    functions_dict = {}
+    for name, func in inspect.getmembers(module, inspect.isfunction):
+        functions_dict[name] = func
+    return functions_dict
+
+
 def get_all_models() -> dict[str, tf.keras.models.Sequential]:
     # d dropout; c cnn; n neural network
     d = {
-        'n': get_dense(),
+        'n': n3(),
         # 'c': get_cnn(),
         # 'linear': get_liner(),
     }
@@ -37,12 +48,10 @@ def get_all_models() -> dict[str, tf.keras.models.Sequential]:
 
 
 def get_all_models_f() -> dict[str, Callable[[], tf.keras.models.Sequential]]:
-    d = {
-        'n': get_dense,
-        # 'c': get_cnn,
-        # 'linear': get_liner,
-    }
-    return d
+    d_dense = extract_functions_to_dict(dense)
+    d_cnn = extract_functions_to_dict(cnn)
+    d_linear = extract_functions_to_dict(linear)
+    return d_dense | d_cnn | d_linear
 
 
 def extract_labels_predictions(model, window: WindowGenerator) -> tuple[list, list]:
@@ -214,7 +223,7 @@ def altogether():
     window = WindowGenerator(21, 1, 1, get_labels(),
                              train_df=train, val_df=val, test_df=test)
 
-    dense = get_dense()
+    dense = n3()
 
     compile_and_fit(dense, window, seed=0, patience=10)
 
@@ -337,4 +346,5 @@ def individually(input_width: int = 7):
 
 
 if __name__ == '__main__':
-    individually()
+    d = get_all_models_f()
+    pass
