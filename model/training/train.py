@@ -9,8 +9,8 @@ import tensorflow as tf
 from sklearn.metrics import r2_score
 
 from model.loader import head
+from model.networks.cnn import get_cnn
 from model.networks.dense import get_dense
-from model.networks.linear import get_liner
 from model.preprocessing import Preprocessor, StockLoadingStrategy, test_stock_number
 from model.window import WindowGenerator
 
@@ -18,7 +18,7 @@ from model.window import WindowGenerator
 This module groups training related functions.
 """
 
-MAX_EPOCHS = 100
+MAX_EPOCHS = 3
 PATIENCE = 10
 
 out_dir: Path = Path('../../out/training')
@@ -27,9 +27,11 @@ if not out_dir.exists():
 
 
 def get_all_models() -> dict[str, tf.keras.models.Sequential]:
+    # d dropout; c cnn; n neural network
     d = {
-        'dense': get_dense(),
-        'linear': get_liner(),
+        'n': get_dense(),
+        'c': get_cnn(),
+        # 'linear': get_liner(),
     }
     return d
 
@@ -102,7 +104,20 @@ def compile_and_fit(model: tf.keras.Model,
     return model
 
 
+def get_input_label_width_cnn(input_width: int, conv_width: int) -> tuple[int, int]:
+    """
+
+    :param input_width:
+    :param conv_width:
+    :return: input width, label width
+    """
+    offset = conv_width - 1
+    return input_width, input_width - offset
+
+
 def train_test_data():
+    input_width = 3
+    conv_width = 3
     check_dir = Path('../checkpoints/testing')
     data_path = Path('../../out/test/testing_data.csv')
     if not data_path.exists():
@@ -112,10 +127,23 @@ def train_test_data():
     preprocessor = Preprocessor(StockLoadingStrategy())
     train, val, test = preprocessor.split_to_dataframes(data_df)
 
-    window = WindowGenerator(1, 1, 1, ['x'],
-                             train_df=train, val_df=val, test_df=test)
+    ordinary_window: WindowGenerator | None = None
+    cnn_window: WindowGenerator | None = None
+    window: WindowGenerator | None = None
 
     for model_name, model in get_all_models().items():
+        if 'c' in model_name:
+            if cnn_window is None:
+                cnn_window = WindowGenerator(input_width, get_input_label_width_cnn(input_width, conv_width)[1], 1,
+                                             ['x'],
+                                             train_df=train, val_df=val, test_df=test)
+            window = cnn_window
+        else:
+            if ordinary_window is None:
+                ordinary_window = WindowGenerator(input_width, 1, 1, ['x'],
+                                                  train_df=train, val_df=val, test_df=test)
+            window = ordinary_window
+
         print(f'Training model {model_name}')
         check_path = check_dir.joinpath(model_name)
 

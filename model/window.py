@@ -39,6 +39,9 @@ class WindowGenerator:
 
         self.preprocessor = Preprocessor(StockLoadingStrategy())
 
+        self.test_inputs = None
+        self.test_labels = None
+
         self.is_mixed_dataset = False
 
         self.train_df = train_df
