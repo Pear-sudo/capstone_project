@@ -9,8 +9,8 @@ import pandas as pd
 from psycopg import Cursor
 from psycopg.rows import Row
 
-from loader import head, tail
 from model.db import Database
+from model.loader import head, tail
 
 """
 This module contains the specialized functions for stock data
