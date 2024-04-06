@@ -8,9 +8,9 @@ def generate_testing_data() -> pd.DataFrame:
     np.random.seed(0)
     size = 10_000
 
-    a = np.random.rand(size)
-    b = np.random.rand(size)
-    c = np.random.rand(size)
+    a = np.random.randint(1, 10, size)
+    b = np.random.randint(1, 10, size)
+    c = np.random.randint(1, 10, size)
 
     # x = np.sin(a) + np.sin(b) + np.sin(c) - 2 * b
     # y = np.power(a, 2) + np.power(b, 2) + np.power(c, 3)
