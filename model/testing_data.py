@@ -17,8 +17,8 @@ def generate_testing_data() -> pd.DataFrame:
     # z = a * b + np.log(c)
 
     x = 2 * a
-    y = 3 * b
-    z = 4 * c
+    y = a * b * c
+    z = np.power(b, 2) - x * c - c
 
     x = np.roll(x, 1)
     y = np.roll(y, 1)

@@ -182,9 +182,6 @@ class WindowGenerator:
         # 4. this makes the analysis of ML performance of different stocks more convenient
         # as the model no longer needs to sacrifice some stocks' performance for the overall performance
 
-
-
-
     @staticmethod
     def check_features(features: list[int]):
         if len(set(features)) != 1:

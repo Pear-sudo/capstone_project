@@ -846,7 +846,7 @@ def test_stock_macro():
     test_stock_var_preprocessing()
 
 
-def test_stock_number() -> list | None:
+def test_stock_number() -> list[str] | None:
     ids = []
     path = Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily.csv')
     if path.exists():
