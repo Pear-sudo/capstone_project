@@ -2,6 +2,7 @@ import os
 import platform
 import random
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -31,6 +32,15 @@ def get_all_models() -> dict[str, tf.keras.models.Sequential]:
         'n': get_dense(),
         # 'c': get_cnn(),
         # 'linear': get_liner(),
+    }
+    return d
+
+
+def get_all_models_f() -> dict[str, Callable[[], tf.keras.models.Sequential]]:
+    d = {
+        'n': get_dense,
+        # 'c': get_cnn,
+        # 'linear': get_liner,
     }
     return d
 
@@ -70,6 +80,7 @@ def compile_and_fit(model: tf.keras.Model,
                     max_epochs: int = MAX_EPOCHS,
                     seed: int | None = None,
                     model_save_path: Path | None = None,
+                    verbose: int = 1,
                     ):
     if seed is not None:
         np.random.seed(seed)
@@ -102,7 +113,7 @@ def compile_and_fit(model: tf.keras.Model,
 
     history = model.fit(window.train, epochs=max_epochs,
                         validation_data=window.val,
-                        callbacks=callbacks)
+                        callbacks=callbacks, verbose=verbose)
 
     return model
 
@@ -208,9 +219,13 @@ def altogether():
     compile_and_fit(dense, window, seed=0, patience=10)
 
 
-def individually():
-    input_width = 7
+def individually(input_width: int = 7):
+    input_width = input_width
     conv_width = 3
+
+    result_dir = Path('../checkpoints/result')
+    if not result_dir.exists():
+        result_dir.mkdir()
 
     check_dir = Path('../checkpoints/main')
 
@@ -232,18 +247,34 @@ def individually():
     train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
     val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
     test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+
+    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
+    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
+    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
+
     # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_train.csv')
     # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_val.csv')
     # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_test.csv')
 
-    for model_name, model in get_all_models().items():
+    all_models_fs = get_all_models_f()
+    total_models = len(all_models_fs)
+    model_count = 1
+    for model_name, model_f in all_models_fs.items():
 
         print(f'Training model {model_name}')
+        result = {
+            'true_values': [],
+            'predicted_values': [],
+        }
         check_path_model = check_dir.joinpath(model_name)
 
+        stock_count = 1
         for stock_id, stock_vars in stock_level_dict.items():
+            total_stock = len(stock_level_dict)
+
             id_str = '{:06}'.format(stock_id)
-            print(f'Training stock {id_str} using {model_name}')
+            print(
+                f'Training stock {id_str} using {model_name} (S: {stock_count}/{total_stock}) M: {model_count}/{total_models}')
 
             check_path_model_stock = check_path_model.joinpath(id_str)
             target_label = f'{closing_price_label}_{stock_id}'
@@ -280,13 +311,29 @@ def individually():
                                          [target_label],
                                          train_df=train_i, val_df=val_i, test_df=test_i)
 
-            compile_and_fit(model, window, seed=0, patience=10, model_save_path=check_path_model_stock)
+            compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path_model_stock, verbose=0)
             model_trained: tf.keras.models.Sequential = load_model(check_path_model_stock)  # load the best
 
-            r = calculate_r2_score(*extract_labels_predictions(model_trained, window))
+            true_values, predicted_values = extract_labels_predictions(model_trained, window)
+            result['true_values'].extend(true_values)
+            result['predicted_values'].extend(predicted_values)
+            r = calculate_r2_score(true_values, predicted_values)
             print(f'R score: {r}')
+            stock_count += 1
 
-            exit(0)
+        subdir = result_dir.joinpath(f'{input_width}')
+        if not subdir.exists():
+            subdir.mkdir()
+        csv_path = subdir.joinpath(f'{model_name}.csv')
+
+        r = calculate_r2_score(result['true_values'], result['predicted_values'])
+        print(f'R score of model {model_name} of width {input_width}: {r}')
+        r_path = result_dir.joinpath(f'{input_width}_{model_name}.txt')
+        with open(r_path, 'w') as f:
+            f.write(str(r))
+
+        pd.DataFrame(result).to_csv(csv_path, index=False)
+        model_count += 1
 
 
 if __name__ == '__main__':
