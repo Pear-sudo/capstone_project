@@ -53,6 +53,9 @@ def extract_labels_predictions(model, window: WindowGenerator) -> tuple[list, li
 
 
 def calculate_r2_score(true_values: list, predictions: list) -> float:
+    # true_values = np.array(true_values)
+    # predictions = np.array(predictions)
+    # r2 = 1 - np.sum((true_values - predictions) ** 2) / np.sum(true_values ** 2)
     r2 = r2_score(true_values, predictions)
     return r2
 
