@@ -16,6 +16,10 @@ def generate_testing_data() -> pd.DataFrame:
     y = np.power(a, 2) + np.power(b, 2) + np.power(c, 3)
     z = a * b + np.log(c)
 
+    x = np.roll(x, -1)
+    y = np.roll(y, -1)
+    z = np.roll(z, -1)
+
     d = pd.DataFrame({
         'a': a,
         'b': b,
@@ -25,7 +29,7 @@ def generate_testing_data() -> pd.DataFrame:
         'z': z
     })
 
-    return d
+    return d[:-1]
 
 
 if __name__ == '__main__':
