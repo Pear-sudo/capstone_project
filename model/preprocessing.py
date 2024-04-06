@@ -1075,4 +1075,5 @@ def all_in_one():
 
 
 if __name__ == "__main__":
+    normalize_data()
     extract_time_signal()
