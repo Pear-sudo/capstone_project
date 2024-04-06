@@ -1031,6 +1031,8 @@ def extract_time_signal():
         df['Month_sin'] = np.sin(df_month * (2. * np.pi / 12.))
         df['Month_cos'] = np.cos(df_month * (2. * np.pi / 12.))
 
+        df.drop(granularity_col_name, axis=1, inplace=True)  # we do not need this when train
+
         df.to_csv(out_dir.joinpath(f'{t}.csv'), index=False)
 
 
@@ -1075,5 +1077,4 @@ def all_in_one():
 
 
 if __name__ == "__main__":
-    normalize_data()
     extract_time_signal()
