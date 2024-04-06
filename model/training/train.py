@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from sklearn.metrics import r2_score
 
 from model.loader import head
 from model.networks.dense import get_dense
@@ -22,6 +23,23 @@ PATIENCE = 10
 out_dir: Path = Path('../../out/training')
 if not out_dir.exists():
     out_dir.mkdir()
+
+
+def calculate_r2_score(model, window: WindowGenerator):
+    predictions = list(model.predict(window.test).flatten())
+    true_values = []
+    # input_values = []
+    for inputs, labels in window.test:
+        true_values.extend(labels.numpy().flatten())
+        # input_values.append(list(inputs.numpy().reshape(inputs.shape[0], -1)))
+
+    r2 = r2_score(true_values, predictions)
+    return r2
+
+
+def load_model(model_path: Path):
+    model = tf.keras.models.load_model(str(model_path.absolute()))
+    return model
 
 
 def compile_and_fit(model: tf.keras.Model,
@@ -63,7 +81,7 @@ def compile_and_fit(model: tf.keras.Model,
                         validation_data=window.val,
                         callbacks=callbacks)
 
-    return history
+    return model
 
 
 def train_test_data():
@@ -76,12 +94,21 @@ def train_test_data():
     preprocessor = Preprocessor(StockLoadingStrategy())
     train, val, test = preprocessor.split_to_dataframes(data_df)
 
-    window = WindowGenerator(1, 1, 1, ['z'],
+    window = WindowGenerator(1, 1, 1, ['x'],
                              train_df=train, val_df=val, test_df=test)
+
+    # val = window.val
+    # inputs, labels = next(iter(val))
+
     dense = get_dense()
     check_path = check_dir.joinpath('dense')
 
-    compile_and_fit(dense, window, seed=0, model_save_path=check_path)
+    # model = compile_and_fit(dense, window, seed=0, model_save_path=check_path)
+
+    model_path = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/testing/dense')
+    model: tf.keras.models.Sequential = load_model(model_path)
+    calculate_r2_score(model, window)
+    pass
 
 
 def get_stock_level_dict() -> dict:
@@ -126,7 +153,7 @@ def altogether():
 
     labels = get_labels()
 
-    window = WindowGenerator(1, 1, 1, get_labels(),
+    window = WindowGenerator(21, 1, 1, get_labels(),
                              train_df=train, val_df=val, test_df=test)
 
     dense = get_dense()
