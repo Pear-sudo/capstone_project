@@ -1,8 +1,8 @@
-from model.window import *
-from model.loader import *
-from model.stocks import *
-from training.baseline import Baseline
 import tensorflow as tf
+
+from model.networks.baseline import Baseline
+from model.stocks import *
+from model.window import *
 
 
 def test_call():
