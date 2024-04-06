@@ -10,6 +10,7 @@ from sklearn.metrics import r2_score
 
 from model.loader import head
 from model.networks.dense import get_dense
+from model.networks.linear import get_liner
 from model.preprocessing import Preprocessor, StockLoadingStrategy, test_stock_number
 from model.window import WindowGenerator
 
@@ -25,14 +26,31 @@ if not out_dir.exists():
     out_dir.mkdir()
 
 
-def calculate_r2_score(model, window: WindowGenerator):
+def get_all_models() -> dict[str, tf.keras.models.Sequential]:
+    d = {
+        'linear': get_liner(),
+        'dense': get_dense(),
+    }
+    return d
+
+
+def extract_labels_predictions(model, window: WindowGenerator) -> tuple[list, list]:
+    """
+
+    :param model:
+    :param window:
+    :return: true_values, predicted_values
+    """
     predictions = list(model.predict(window.test).flatten())
     true_values = []
-    input_values = []
+    # input_values = []
     for inputs, labels in window.test:
         true_values.extend(labels.numpy().flatten())
-        input_values.append(list(inputs.numpy().reshape(inputs.shape[0], -1)))
+        # input_values.append(list(inputs.numpy().reshape(inputs.shape[0], -1)))
+    return true_values, predictions
 
+
+def calculate_r2_score(true_values: list, predictions: list) -> float:
     r2 = r2_score(true_values, predictions)
     return r2
 
@@ -103,11 +121,11 @@ def train_test_data():
     dense = get_dense()
     check_path = check_dir.joinpath('dense')
 
-    # model = compile_and_fit(dense, window, seed=0, model_save_path=check_path)
+    model = compile_and_fit(dense, window, seed=0, model_save_path=check_path)
 
     model_path = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/testing/dense')
     model: tf.keras.models.Sequential = load_model(model_path)
-    r = calculate_r2_score(model, window)
+    r = calculate_r2_score(*extract_labels_predictions(model, window))
     print(r)
 
 
