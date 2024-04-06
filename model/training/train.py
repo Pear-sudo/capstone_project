@@ -329,6 +329,7 @@ def individually(input_width: int = 7):
             r = calculate_r2_score(true_values, predicted_values)
             print(f'R score: {r}')
             stock_count += 1
+            # break
 
         subdir = result_dir.joinpath(f'{input_width}')
         if not subdir.exists():
@@ -346,5 +347,4 @@ def individually(input_width: int = 7):
 
 
 if __name__ == '__main__':
-    d = get_all_models_f()
-    pass
+    individually()

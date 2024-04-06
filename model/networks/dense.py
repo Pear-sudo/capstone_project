@@ -126,6 +126,26 @@ def ndndnd7():
         tf.keras.layers.Reshape([1, -1]),
     ])
 
+
+def nn32():
+    return tf.keras.Sequential([
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(units=32, activation='relu'),
+        tf.keras.layers.Dense(units=32, activation='relu'),
+        tf.keras.layers.Dense(units=1),
+        tf.keras.layers.Reshape([1, -1]),
+    ])
+
+
+def nn64():
+    return tf.keras.Sequential([
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(units=64, activation='relu'),
+        tf.keras.layers.Dense(units=64, activation='relu'),
+        tf.keras.layers.Dense(units=1),
+        tf.keras.layers.Reshape([1, -1]),
+    ])
+
 # def get_multi_step_dense():
 #     return tf.keras.Sequential([
 #         # Shape: (time, features) => (time*features)
