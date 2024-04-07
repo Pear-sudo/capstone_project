@@ -219,10 +219,12 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
                     check_dir: Path, result_saving_dir: Path,
                     macros: list[str],
                     model_count: int, total_model_count: int,
-                    is_testing: bool = False
+                    is_testing: bool = False,
+                    ignore_existing: bool = False,
                     ):
     """
     Train a model on each stock.
+    :param ignore_existing: if true, ignore existing result and train the model again
     :param train: training dataframe
     :param val: validation dataframe
     :param test: testing dataframe
@@ -239,6 +241,25 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
     :param is_testing: Train the model on one stock and immediately return
     :return:
     """
+    # first work out where to save our results
+    # the file to save aggregated r score
+    if not result_saving_dir.exists():
+        result_saving_dir.mkdir()
+    result_path = result_saving_dir.joinpath(f'{input_width}_{model_name}.txt')
+
+    # the file to save the true values, predicted value pairs for later inspection
+    subdir = result_saving_dir.joinpath(f'{input_width}')
+    if not subdir.exists():
+        subdir.mkdir(parents=True)
+    csv_path = subdir.joinpath(f'{model_name}.csv')
+
+    # test if the model has already been trained, we do this by only focusing on the final r score file
+    if not ignore_existing:
+        if result_path.exists():
+            print(f'Model {model_name} with input width {input_width} has already been trained, '
+                  f'the result r score is at {result_path}')
+            return
+
     total_stock_count = len(stock_level_dict)
     closing_price_label = 'Clsprc'
 
@@ -307,17 +328,10 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
     print(f'R score of model {model_name} of width {input_width}: {r}')
 
     # save the r score of the model to a txt file
-    if not result_saving_dir.exists():
-        result_saving_dir.mkdir()
-    result_path = result_saving_dir.joinpath(f'{input_width}_{model_name}.txt')
     with open(result_path, 'w') as f:
         f.write(str(r))
 
     # also backup the true values and predicted values to a csv file
-    subdir = result_saving_dir.joinpath(f'{input_width}')
-    if not subdir.exists():
-        subdir.mkdir(parents=True)
-    csv_path = subdir.joinpath(f'{model_name}.csv')
     pd.DataFrame(result).to_csv(csv_path, index=False)
 
     # end train_one_model()
