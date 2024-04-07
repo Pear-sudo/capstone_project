@@ -309,7 +309,7 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
                                      1,
                                      [target_label],
                                      train_df=train_i, val_df=val_i, test_df=test_i)
-        if not check_path.exists():
+        if not check_path.exists() or not len(list(check_path.iterdir())) > 0:
             compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path, verbose=0)
         else:
             print(f'Checkpoint {check_path} already exists, loading model directly')
@@ -422,14 +422,14 @@ def train_with_multi_sizes(is_testing=False):
     if not e_path.exists():
         e_path.mkdir(parents=True)
     e_path = e_path.joinpath('exception.txt')
-    size = [7, 14, 28, 48]
+    sizes = [7, 14, 28, 48]
     exception_count = 0
     while exception_count < 14:
         try:
-            for size in size:
+            for size in sizes:
                 train_with_fixed_input_width(size, is_testing=is_testing)
             return
-        except Exception as e:
+        except Exception as e:  # but why there are errors? and why run it again the error disappears? why?
             exception_count += 1
             with open(e_path, "a") as file:  # Open the log file in append mode
                 file.write(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Exception {exception_count}: {str(e)}\n')
