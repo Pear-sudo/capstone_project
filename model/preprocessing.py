@@ -1100,4 +1100,5 @@ def replace_with_random_data():
 
 
 if __name__ == "__main__":
+    extract_time_signal()
     replace_with_random_data()

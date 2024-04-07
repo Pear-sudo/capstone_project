@@ -222,6 +222,7 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
                     macros: list[str],
                     model_count: int, total_model_count: int,
                     is_testing: bool = False,
+                    includes_signals: bool = True,
                     ignore_existing: bool = False,
                     ):
     """
@@ -289,6 +290,8 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
         target_label = f'{closing_price_label}_{stock_id}'
 
         selectors = stock_vars + macros
+        if includes_signals:
+            selectors.extend(['Week_sin', 'Week_cos', 'Month_sin', 'Month_cos'])
 
         train_i = train[selectors]
         val_i = val[selectors]
@@ -344,7 +347,8 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
 def train_with_fixed_input_width(input_width: int = 7,
                                  is_testing=False,
                                  model_dict: dict[str, Callable[[], Sequential]] | None = None,
-                                 stock_filter: list[str] = None):
+                                 stock_filter: list[str] = None,
+                                 includes_signals: bool = True, ):
     input_width = input_width
     conv_width = 3  # this must match the setting in the conv neural network model
 
@@ -404,7 +408,8 @@ def train_with_fixed_input_width(input_width: int = 7,
                                      check_dir, result_dir,
                                      macros_all,
                                      model_count, total_models,
-                                     is_testing)
+                                     is_testing=is_testing,
+                                     includes_signals=includes_signals)
             futures.append(future)
             model_count += 1
 
@@ -419,4 +424,4 @@ def train_with_multi_sizes(is_testing=False):
 
 
 if __name__ == '__main__':
-    train_with_multi_sizes()
+    train_with_multi_sizes(is_testing=True)
