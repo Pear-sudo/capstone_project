@@ -306,8 +306,10 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
                                      1,
                                      [target_label],
                                      train_df=train_i, val_df=val_i, test_df=test_i)
-
-        compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path, verbose=0)
+        if not check_path.exists():
+            compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path, verbose=0)
+        else:
+            print(f'Checkpoint {check_path} already exists, loading model directly')
         model_trained: tf.keras.models.Sequential = load_model(check_path)  # load the best
 
         true_values, predicted_values = extract_labels_predictions(model_trained, window)
@@ -381,7 +383,7 @@ def train_with_fixed_input_width(input_width: int = 7,
     total_models = len(model_dict)
 
     model_count = 1
-    max_parallel_tasks = 8
+    max_parallel_tasks = 6
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_parallel_tasks) as executor:
         futures = []
         results = []
@@ -417,4 +419,4 @@ def train_with_multi_sizes(is_testing=False):
 
 
 if __name__ == '__main__':
-    train_with_fixed_input_width()
+    train_with_multi_sizes()
