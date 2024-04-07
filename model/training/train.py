@@ -418,6 +418,10 @@ def train_with_fixed_input_width(input_width: int = 7,
 
 
 def train_with_multi_sizes(is_testing=False):
+    e_path = Path('../checkpoints/log')
+    if not e_path.exists():
+        e_path.mkdir(parents=True)
+    e_path = e_path.joinpath('exception.txt')
     size = [7, 14, 28, 48]
     exception_count = 0
     while exception_count < 14:
@@ -427,7 +431,9 @@ def train_with_multi_sizes(is_testing=False):
             return
         except Exception as e:
             exception_count += 1
+            with open(e_path, "a") as file:  # Open the log file in append mode
+                file.write(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Exception {exception_count}: {str(e)}\n')
 
 
 if __name__ == '__main__':
-    train_with_multi_sizes(is_testing=True)
+    train_with_multi_sizes()
