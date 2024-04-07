@@ -419,8 +419,14 @@ def train_with_fixed_input_width(input_width: int = 7,
 
 def train_with_multi_sizes(is_testing=False):
     size = [7, 14, 28, 48]
-    for size in size:
-        train_with_fixed_input_width(size, is_testing=is_testing)
+    exception_count = 0
+    while exception_count < 14:
+        try:
+            for size in size:
+                train_with_fixed_input_width(size, is_testing=is_testing)
+            return
+        except Exception as e:
+            exception_count += 1
 
 
 if __name__ == '__main__':
