@@ -381,7 +381,7 @@ def train_with_fixed_input_width(input_width: int = 7,
     total_models = len(model_dict)
 
     model_count = 1
-    max_parallel_tasks = 6
+    max_parallel_tasks = 8
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_parallel_tasks) as executor:
         futures = []
         results = []
@@ -393,7 +393,6 @@ def train_with_fixed_input_width(input_width: int = 7,
                 for future in done:
                     results.append(future.result())
                     futures.remove(future)
-                    model_count += 1
 
             future = executor.submit(train_one_model,
                                      train.copy(), val.copy(), test.copy(),
@@ -405,6 +404,7 @@ def train_with_fixed_input_width(input_width: int = 7,
                                      model_count, total_models,
                                      is_testing)
             futures.append(future)
+            model_count += 1
 
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
@@ -417,4 +417,4 @@ def train_with_multi_sizes(is_testing=False):
 
 
 if __name__ == '__main__':
-    train_with_fixed_input_width(48, model_dict={'nnn3': dense.nnn3})
+    train_with_fixed_input_width()
