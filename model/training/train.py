@@ -341,7 +341,8 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
 
 def train_with_fixed_input_width(input_width: int = 7,
                                  is_testing=False,
-                                 model_dict: dict[str, Callable[[], Sequential]] | None = None):
+                                 model_dict: dict[str, Callable[[], Sequential]] | None = None,
+                                 stock_filter: list[str] = None):
     input_width = input_width
     conv_width = 3  # this must match the setting in the conv neural network model
 
@@ -362,6 +363,9 @@ def train_with_fixed_input_width(input_width: int = 7,
 
     # get names of the stock and their corresponding stock level variables
     stock_level_dict = get_stock_level_dict()
+    if stock_filter is not None:
+        stock_filter = [str(int(s)) for s in stock_filter]
+        stock_level_dict = {s: stock_level_dict[s] for s in stock_filter if s in stock_level_dict}
     stock_all = []
     for v in stock_level_dict.values():
         stock_all.extend(v)
@@ -413,4 +417,4 @@ def train_with_multi_sizes(is_testing=False):
 
 
 if __name__ == '__main__':
-    train_with_fixed_input_width(48, is_testing=True, model_dict={'nnn3': dense.nnn3})
+    train_with_fixed_input_width(48, model_dict={'nnn3': dense.nnn3})
