@@ -313,7 +313,17 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
             compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path, verbose=0)
         else:
             print(f'Checkpoint {check_path} already exists, loading model directly')
-        model_trained: tf.keras.models.Sequential = load_model(check_path)  # load the best
+
+        load_failure_count = 0
+        load_succeeded = False
+        while load_failure_count < 1 and load_succeeded is False:
+            try:
+                model_trained: tf.keras.models.Sequential = load_model(check_path)  # load the best
+                load_succeeded = True
+            except Exception as e:
+                load_failure_count += 1
+                # whatever error occurred, try it again anyway
+                print(f'Failed to load model at {load_failure_count} try: {e}')
 
         true_values, predicted_values = extract_labels_predictions(model_trained, window)
         result['true_values'].extend(true_values)
@@ -433,6 +443,7 @@ def train_with_multi_sizes(is_testing=False):
             exception_count += 1
             with open(e_path, "a") as file:  # Open the log file in append mode
                 file.write(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Exception {exception_count}: {str(e)}\n')
+    exit(1)
 
 
 if __name__ == '__main__':
