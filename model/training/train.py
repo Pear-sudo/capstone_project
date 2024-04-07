@@ -2,6 +2,7 @@ import inspect
 import os
 import platform
 import random
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -211,142 +212,170 @@ def get_labels() -> list[str]:
     return labels
 
 
-def altogether():
+def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
+                    model_name, model_f: Callable[[], tf.keras.models.Sequential],
+                    input_width: int, conv_width: int,
+                    stock_level_dict: dict[int, list[str]],
+                    check_dir: Path, result_saving_dir: Path,
+                    macros: list[str],
+                    model_count: int, total_model_count: int,
+                    is_testing: bool = False
+                    ):
+    """
+    Train a model on each stock.
+    :param train: training dataframe
+    :param val: validation dataframe
+    :param test: testing dataframe
+    :param model_name: Name of the model
+    :param model_f: A FUNCTION that returns a model
+    :param input_width:
+    :param conv_width:
+    :param stock_level_dict: A dict containing all stocks need to be trained and their stock level variables
+    :param check_dir: The directory to save the checkpoints (give me the general path and I'll create subdir for you)
+    :param result_saving_dir: The directory to save the r score, labels and predictions
+    :param macros: A list of macro variables used to train the model.
+    :param model_count: The current model count, used for progress reporting
+    :param total_model_count: Total number of models to train
+    :param is_testing: Train the model on one stock and immediately return
+    :return:
+    """
+    total_stock_count = len(stock_level_dict)
     closing_price_label = 'Clsprc'
 
-    train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
-    val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
-    test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+    check_dir = check_dir.joinpath(str(input_width)).joinpath(model_name)
+    if not check_dir.exists():
+        check_dir.mkdir(parents=True)
 
-    labels = get_labels()
+    print(f'Training model {model_name}')
+    result = {
+        'true_values': [],
+        'predicted_values': [],
+    }
 
-    window = WindowGenerator(21, 1, 1, get_labels(),
-                             train_df=train, val_df=val, test_df=test)
+    stock_count = 1
+    for stock_id, stock_vars in stock_level_dict.items():
 
-    dense = n3()
+        id_str = '{:06}'.format(stock_id)
+        print(f'Training stock {id_str} using {model_name} '
+              f'(S: {stock_count}/{total_stock_count}) '
+              f'(M: {model_count}/{total_model_count}) '
+              f'(L: {input_width}) '
+              f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]')
 
-    compile_and_fit(dense, window, seed=0, patience=10)
+        check_path = check_dir.joinpath(id_str)
+        target_label = f'{closing_price_label}_{stock_id}'
+
+        selectors = stock_vars + macros
+
+        train_i = train[selectors]
+        val_i = val[selectors]
+        test_i = test[selectors]
+
+        if 'c' in model_name:
+            window = WindowGenerator(input_width,
+                                     get_input_label_width_cnn(input_width, conv_width)[1],
+                                     1,
+                                     [target_label],
+                                     train_df=train_i, val_df=val_i, test_df=test_i)
+        else:
+            window = WindowGenerator(input_width,
+                                     1,
+                                     1,
+                                     [target_label],
+                                     train_df=train_i, val_df=val_i, test_df=test_i)
+
+        compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path, verbose=0)
+        model_trained: tf.keras.models.Sequential = load_model(check_path)  # load the best
+
+        true_values, predicted_values = extract_labels_predictions(model_trained, window)
+        result['true_values'].extend(true_values)
+        result['predicted_values'].extend(predicted_values)
+
+        r = calculate_r2_score(true_values, predicted_values)
+        print(f'R score: {r}')
+
+        stock_count += 1
+
+        if is_testing:
+            return
+
+        # end for loop for individual stocks
+
+    # calculate the aggregated r score
+    true_values, predicted_values = result['true_values'], result['predicted_values']
+    r = calculate_r2_score(true_values, predicted_values)
+    print(f'R score of model {model_name} of width {input_width}: {r}')
+
+    # save the r score of the model to a txt file
+    if not result_saving_dir.exists():
+        result_saving_dir.mkdir()
+    result_path = result_saving_dir.joinpath(f'{input_width}_{model_name}.txt')
+    with open(result_path, 'w') as f:
+        f.write(str(r))
+
+    # also backup the true values and predicted values to a csv file
+    subdir = result_saving_dir.joinpath(f'{input_width}')
+    if not subdir.exists():
+        subdir.mkdir(parents=True)
+    csv_path = subdir.joinpath(f'{model_name}.csv')
+    pd.DataFrame(result).to_csv(csv_path, index=False)
+
+    # end train_one_model()
 
 
-def individually(input_width: int = 7):
+def train_with_fixed_input_width(input_width: int = 7, is_testing=False):
     input_width = input_width
-    conv_width = 3
+    conv_width = 3  # this must match the setting in the conv neural network model
 
+    # no worry about their existence, train_one_model() will handle it
     result_dir = Path('../checkpoints/result')
-    if not result_dir.exists():
-        result_dir.mkdir()
-
     check_dir = Path('../checkpoints/main')
 
+    # get the name of all macro variables
     macros_all = (head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/merge/macro_test.csv'), 1)[0]
                   .split(','))
     macros_all.remove('Date')
 
+    # get the name of macro variables at daily level
     macros_daily = \
         head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/macro/raw_data_daily_filled_test.csv'), 1)[
             0].split(',')
     macros_daily.remove('Date')
 
-    closing_price_label = 'Clsprc'
+    # get names of the stock and their corresponding stock level variables
     stock_level_dict = get_stock_level_dict()
     stock_all = []
     for v in stock_level_dict.values():
         stock_all.extend(v)
 
+    # load the dataset
     train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
     val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
     test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
 
-    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
-    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
-    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
-
-    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_train.csv')
-    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_val.csv')
-    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily_filled_test.csv')
-
+    # get all the models we need to train
     all_models_fs = get_all_models_f()
     total_models = len(all_models_fs)
+
     model_count = 1
     for model_name, model_f in all_models_fs.items():
-
-        print(f'Training model {model_name}')
-        result = {
-            'true_values': [],
-            'predicted_values': [],
-        }
-        check_path_model = check_dir.joinpath(model_name)
-
-        stock_count = 1
-        for stock_id, stock_vars in stock_level_dict.items():
-            total_stock = len(stock_level_dict)
-
-            id_str = '{:06}'.format(stock_id)
-            print(
-                f'Training stock {id_str} using {model_name} (S: {stock_count}/{total_stock}) M: {model_count}/{total_models}')
-
-            check_path_model_stock = check_path_model.joinpath(id_str)
-            target_label = f'{closing_price_label}_{stock_id}'
-
-            selectors = stock_vars + macros_all
-            # selectors = stock_vars
-
-            train_i = train[selectors]
-            val_i = val[selectors]
-            test_i = test[selectors]
-
-            # check_path_model_stock = Path('../checkpoints/testing')
-            # data_path = Path('../../out/test/testing_data.csv')
-            #
-            # data_df = pd.read_csv(data_path)
-            # preprocessor = Preprocessor(StockLoadingStrategy())
-            # train, val, test = preprocessor.split_to_dataframes(data_df)
-            #
-            # train_i = train
-            # val_i = val
-            # test_i = train
-            # target_label = 'x'
-
-            if 'c' in model_name:
-                window = WindowGenerator(input_width,
-                                         get_input_label_width_cnn(input_width, conv_width)[1],
-                                         1,
-                                         [target_label],
-                                         train_df=train_i, val_df=val_i, test_df=test_i)
-            else:
-                window = WindowGenerator(input_width,
-                                         1,
-                                         1,
-                                         [target_label],
-                                         train_df=train_i, val_df=val_i, test_df=test_i)
-
-            compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path_model_stock, verbose=0)
-            model_trained: tf.keras.models.Sequential = load_model(check_path_model_stock)  # load the best
-
-            true_values, predicted_values = extract_labels_predictions(model_trained, window)
-            result['true_values'].extend(true_values)
-            result['predicted_values'].extend(predicted_values)
-            r = calculate_r2_score(true_values, predicted_values)
-            print(f'R score: {r}')
-            stock_count += 1
-            # break
-
-        subdir = result_dir.joinpath(f'{input_width}')
-        if not subdir.exists():
-            subdir.mkdir()
-        csv_path = subdir.joinpath(f'{model_name}.csv')
-
-        r = calculate_r2_score(result['true_values'], result['predicted_values'])
-        print(f'R score of model {model_name} of width {input_width}: {r}')
-        r_path = result_dir.joinpath(f'{input_width}_{model_name}.txt')
-        with open(r_path, 'w') as f:
-            f.write(str(r))
-
-        pd.DataFrame(result).to_csv(csv_path, index=False)
+        # the number of parameters seem crazy, but it is much better than having one large function
+        train_one_model(train.copy(), val.copy(), test.copy(),
+                        model_name, model_f,
+                        input_width, conv_width,
+                        stock_level_dict,
+                        check_dir, result_dir,
+                        macros_all,
+                        model_count, total_models,
+                        is_testing)
         model_count += 1
 
 
-if __name__ == '__main__':
+def train_with_multi_sizes(is_testing=False):
     size = [7, 14, 28, 48]
     for size in size:
-        individually(size)
+        train_with_fixed_input_width(size, is_testing=is_testing)
+
+
+if __name__ == '__main__':
+    train_with_fixed_input_width(7, is_testing=True)
