@@ -10,6 +10,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from keras import Sequential
 from sklearn.metrics import r2_score
 
 import model.networks.cnn as cnn
@@ -338,7 +339,9 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
     # end train_one_model()
 
 
-def train_with_fixed_input_width(input_width: int = 7, is_testing=False):
+def train_with_fixed_input_width(input_width: int = 7,
+                                 is_testing=False,
+                                 model_dict: dict[str, Callable[[], Sequential]] | None = None):
     input_width = input_width
     conv_width = 3  # this must match the setting in the conv neural network model
 
@@ -369,16 +372,17 @@ def train_with_fixed_input_width(input_width: int = 7, is_testing=False):
     test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
 
     # get all the models we need to train
-    all_models_fs = get_all_models_f()
-    total_models = len(all_models_fs)
+    if model_dict is None:
+        model_dict = get_all_models_f()
+    total_models = len(model_dict)
 
     model_count = 1
-    max_parallel_tasks = 4
+    max_parallel_tasks = 6
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_parallel_tasks) as executor:
         futures = []
         results = []
 
-        for model_name, model_f in all_models_fs.items():
+        for model_name, model_f in model_dict.items():
             if len(futures) >= max_parallel_tasks:
                 done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
 
@@ -409,4 +413,4 @@ def train_with_multi_sizes(is_testing=False):
 
 
 if __name__ == '__main__':
-    train_with_fixed_input_width(7, is_testing=True)
+    train_with_fixed_input_width(48, is_testing=True, model_dict={'nnn3': dense.nnn3})
