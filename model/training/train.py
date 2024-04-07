@@ -1,3 +1,4 @@
+import concurrent.futures
 import inspect
 import os
 import platform
@@ -372,17 +373,33 @@ def train_with_fixed_input_width(input_width: int = 7, is_testing=False):
     total_models = len(all_models_fs)
 
     model_count = 1
-    for model_name, model_f in all_models_fs.items():
-        # the number of parameters seem crazy, but it is much better than having one large function
-        train_one_model(train.copy(), val.copy(), test.copy(),
-                        model_name, model_f,
-                        input_width, conv_width,
-                        stock_level_dict,
-                        check_dir, result_dir,
-                        macros_all,
-                        model_count, total_models,
-                        is_testing)
-        model_count += 1
+    max_parallel_tasks = 4
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_parallel_tasks) as executor:
+        futures = []
+        results = []
+
+        for model_name, model_f in all_models_fs.items():
+            if len(futures) >= max_parallel_tasks:
+                done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+
+                for future in done:
+                    results.append(future.result())
+                    futures.remove(future)
+                    model_count += 1
+
+            future = executor.submit(train_one_model,
+                                     train.copy(), val.copy(), test.copy(),
+                                     model_name, model_f,
+                                     input_width, conv_width,
+                                     stock_level_dict,
+                                     check_dir, result_dir,
+                                     macros_all,
+                                     model_count, total_models,
+                                     is_testing)
+            futures.append(future)
+
+        for future in concurrent.futures.as_completed(futures):
+            results.append(future.result())
 
 
 def train_with_multi_sizes(is_testing=False):
