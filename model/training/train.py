@@ -33,7 +33,7 @@ if not out_dir.exists():
     out_dir.mkdir()
 
 
-def extract_functions_to_dict(module) -> dict:
+def extract_functions_to_dict(module) -> dict[str, Callable]:
     functions_dict = {}
     for name, func in inspect.getmembers(module, inspect.isfunction):
         functions_dict[name] = func
@@ -387,9 +387,12 @@ def train_with_fixed_input_width(input_width: int = 7,
         stock_all.extend(v)
 
     # load the dataset
-    train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
-    val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
-    test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
+    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
+    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+    train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
+    val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
+    test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
 
     # get all the models we need to train
     if model_dict is None:
