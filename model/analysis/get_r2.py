@@ -47,5 +47,5 @@ def get_r2(path: Path):
 if __name__ == '__main__':
     real = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints_real/result')
     random = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/result')
-    # get_r2(real)
-    get_r2(random)
+    get_r2(real)
+    # get_r2(random)

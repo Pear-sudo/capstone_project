@@ -14,8 +14,6 @@ from keras import Sequential
 from sklearn.metrics import r2_score
 
 import model.networks.cnn as cnn
-import model.networks.dense as dense
-import model.networks.linear as linear
 from model.loader import head
 from model.networks.dense import n3
 from model.preprocessing import Preprocessor, StockLoadingStrategy, test_stock_number
@@ -51,10 +49,10 @@ def get_all_models() -> dict[str, tf.keras.models.Sequential]:
 
 
 def get_all_models_f() -> dict[str, Callable[[], tf.keras.models.Sequential]]:
-    d_dense = extract_functions_to_dict(dense)
+    # d_dense = extract_functions_to_dict(dense)
     d_cnn = extract_functions_to_dict(cnn)
-    d_linear = extract_functions_to_dict(linear)
-    return d_dense | d_cnn | d_linear
+    # d_linear = extract_functions_to_dict(linear)
+    return d_cnn
 
 
 def extract_labels_predictions(model, window: WindowGenerator) -> tuple[list, list]:
@@ -94,11 +92,12 @@ def compile_and_fit(model: tf.keras.Model,
                     model_save_path: Path | None = None,
                     verbose: int = 1,
                     ):
-    if seed is not None:
-        np.random.seed(seed)
-        random.seed(seed)
-        tf.random.set_seed(seed)
-        os.environ['PYTHONHASHSEED'] = str(seed)
+    if seed is None:
+        seed = 0
+    np.random.seed(seed)
+    random.seed(seed)
+    tf.random.set_seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
     if model_save_path and not model_save_path.exists():
         model_save_path.mkdir(exist_ok=False, parents=True)
@@ -244,10 +243,14 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
     :param is_testing: Train the model on one stock and immediately return
     :return:
     """
+    train_backup_df = train.copy()
+    val_backup_df = val.copy()
+    test_backup_df = test.copy()
+
     # first work out where to save our results
     # the file to save aggregated r score
     if not result_saving_dir.exists():
-        result_saving_dir.mkdir()
+        result_saving_dir.mkdir(parents=True)
     result_path = result_saving_dir.joinpath(f'{input_width}_{model_name}.txt')
 
     # the file to save the true values, predicted value pairs for later inspection
@@ -297,20 +300,41 @@ def train_one_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame,
         val_i = val[selectors]
         test_i = test[selectors]
 
-        if 'c' in model_name:
-            window = WindowGenerator(input_width,
-                                     get_input_label_width_cnn(input_width, conv_width)[1],
-                                     1,
-                                     [target_label],
-                                     train_df=train_i, val_df=val_i, test_df=test_i)
-        else:
-            window = WindowGenerator(input_width,
-                                     1,
-                                     1,
-                                     [target_label],
-                                     train_df=train_i, val_df=val_i, test_df=test_i)
-        if not check_path.exists() or not len(list(check_path.iterdir())) > 0:
-            compile_and_fit(model_f(), window, seed=0, patience=10, model_save_path=check_path, verbose=0)
+        window = WindowGenerator(input_width,
+                                 1,
+                                 1,
+                                 [target_label],
+                                 train_df=train_i, val_df=val_i, test_df=test_i)
+
+        if ignore_existing or not check_path.exists() or not len(list(check_path.iterdir())) > 0:
+            if 'c' in model_name:
+                m = model_f(input_width)
+            else:
+                m = model_f()
+            try:
+                compile_and_fit(m, window, seed=0, patience=10, model_save_path=check_path, verbose=0)
+            except Exception as e:
+                print('An error occurred during training, retry using the backup data')
+                try:
+                    if 'c' in model_name:
+                        m = model_f(input_width)
+                    else:
+                        m = model_f()
+
+                    train_i = train_backup_df[selectors]
+                    val_i = val_backup_df[selectors]
+                    test_i = test_backup_df[selectors]
+
+                    window = WindowGenerator(input_width,
+                                             1,
+                                             1,
+                                             [target_label],
+                                             train_df=train_i, val_df=val_i, test_df=test_i)
+                    compile_and_fit(m, window, seed=0, patience=10, model_save_path=check_path, verbose=0)
+
+                    print('Retry using backup data successfully')
+                except Exception as e:
+                    print('Retry using the backup data failed')
         else:
             print(f'Checkpoint {check_path} already exists, loading model directly')
 
@@ -358,13 +382,14 @@ def train_with_fixed_input_width(input_width: int = 7,
                                  is_testing=False,
                                  model_dict: dict[str, Callable[[], Sequential]] | None = None,
                                  stock_filter: list[str] = None,
-                                 includes_signals: bool = True, ):
+                                 includes_signals: bool = True,
+                                 ignore_existing: bool = False):
     input_width = input_width
     conv_width = 3  # this must match the setting in the conv neural network model
 
     # no worry about their existence, train_one_model() will handle it
-    result_dir = Path('../checkpoints/result')
-    check_dir = Path('../checkpoints/main')
+    result_dir = Path('../checkpoints_real/result')
+    check_dir = Path('../checkpoints_real/main')
 
     # get the name of all macro variables
     macros_all = (head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/merge/macro_test.csv'), 1)[0]
@@ -387,12 +412,12 @@ def train_with_fixed_input_width(input_width: int = 7,
         stock_all.extend(v)
 
     # load the dataset
-    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
-    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
-    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
-    train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
-    val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
-    test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
+    train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
+    val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
+    test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
+    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
+    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
 
     # get all the models we need to train
     if model_dict is None:
@@ -422,7 +447,8 @@ def train_with_fixed_input_width(input_width: int = 7,
                                      macros_all,
                                      model_count, total_models,
                                      is_testing=is_testing,
-                                     includes_signals=includes_signals)
+                                     includes_signals=includes_signals,
+                                     ignore_existing=ignore_existing)
             futures.append(future)
             model_count += 1
 
@@ -430,17 +456,18 @@ def train_with_fixed_input_width(input_width: int = 7,
             results.append(future.result())
 
 
-def train_with_multi_sizes(is_testing=False):
+def train_with_multi_sizes(is_testing=False, ignore_existing: bool = False, sizes: list[int] = None):
     e_path = Path('../checkpoints/log')
     if not e_path.exists():
         e_path.mkdir(parents=True)
     e_path = e_path.joinpath('exception.txt')
-    sizes = [7, 14, 28, 48]
+    if sizes is None:
+        sizes = [7, 14, 28, 48]
     exception_count = 0
     while exception_count < 14:
         try:
             for size in sizes:
-                train_with_fixed_input_width(size, is_testing=is_testing)
+                train_with_fixed_input_width(size, is_testing=is_testing, ignore_existing=ignore_existing)
             return
         except Exception as e:  # but why there are errors? and why run it again the error disappears? why?
             exception_count += 1
@@ -450,4 +477,4 @@ def train_with_multi_sizes(is_testing=False):
 
 
 if __name__ == '__main__':
-    train_with_multi_sizes()
+    train_with_multi_sizes(ignore_existing=True, sizes=[48])
