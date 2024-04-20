@@ -846,7 +846,7 @@ def test_stock_macro():
     test_stock_var_preprocessing()
 
 
-def test_stock_number() -> list[str] | None:
+def test_stock_number(formatted: bool = False) -> list[str] | None:
     ids = []
     path = Path(r'/Users/a/PycharmProjects/capstone/capstone project/out/stock/raw_data_daily.csv')
     if path.exists():
@@ -859,6 +859,12 @@ def test_stock_number() -> list[str] | None:
         unique = set(ids)
         count = len(unique)
         print(f'Number of ids: {count}')
+        if formatted:
+            ids_f = []
+            for i in unique:
+                id_str = '{:06}'.format(int(i))
+                ids_f.append(id_str)
+            return ids_f
         return list(unique)
     return None
 
@@ -1100,5 +1106,5 @@ def replace_with_random_data():
 
 
 if __name__ == "__main__":
-    extract_time_signal()
-    replace_with_random_data()
+    s = '\n'.join(test_stock_number(formatted=True))
+    print(s)

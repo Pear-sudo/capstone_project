@@ -1,8 +1,10 @@
 import concurrent.futures
 import inspect
+import itertools
 import os
 import platform
 import random
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -15,7 +17,7 @@ from sklearn.metrics import r2_score
 
 import model.networks.cnn as cnn
 from model.loader import head
-from model.networks.dense import n3
+from model.networks.dense import n3, nnn5
 from model.preprocessing import Preprocessor, StockLoadingStrategy, test_stock_number
 from model.window import WindowGenerator
 
@@ -29,6 +31,15 @@ PATIENCE = 10
 out_dir: Path = Path('../../out/training')
 if not out_dir.exists():
     out_dir.mkdir()
+
+
+@dataclass
+class TrainConfig:
+    macros: list[str]
+    include_stock_specific: bool
+    include_signal: bool
+    omit_monthly: bool
+    category_name: str = None
 
 
 def extract_functions_to_dict(module) -> dict[str, Callable]:
@@ -383,18 +394,30 @@ def train_with_fixed_input_width(input_width: int = 7,
                                  model_dict: dict[str, Callable[[], Sequential]] | None = None,
                                  stock_filter: list[str] = None,
                                  includes_signals: bool = True,
-                                 ignore_existing: bool = False):
+                                 ignore_existing: bool = False,
+                                 train_configs: list[TrainConfig] = None,
+                                 output_dir_name: str = None
+                                 ):
     input_width = input_width
     conv_width = 3  # this must match the setting in the conv neural network model
 
     # no worry about their existence, train_one_model() will handle it
-    result_dir = Path('../checkpoints_real/result')
-    check_dir = Path('../checkpoints_real/main')
+    if output_dir_name is None or output_dir_name == '':
+        output_dir_name = 'checkpoints'
+
+    result_dir = Path(f'../{output_dir_name}/result')
+    _result_dir = Path(result_dir)
+    check_dir = Path(f'../{output_dir_name}/main')
+    _check_dir = Path(check_dir)
 
     # get the name of all macro variables
     macros_all = (head(Path('/Users/a/PycharmProjects/capstone/capstone project/out/merge/macro_test.csv'), 1)[0]
                   .split(','))
-    macros_all.remove('Date')
+    try:
+        macros_all.remove('Date')
+    except ValueError:
+        # if this nasty column is not there, we are good
+        pass
 
     # get the name of macro variables at daily level
     macros_daily = \
@@ -403,7 +426,7 @@ def train_with_fixed_input_width(input_width: int = 7,
     macros_daily.remove('Date')
 
     # get names of the stock and their corresponding stock level variables
-    stock_level_dict = get_stock_level_dict()
+    stock_level_dict: dict[str, list[str]] = get_stock_level_dict()
     if stock_filter is not None:
         stock_filter = [str(int(s)) for s in stock_filter]
         stock_level_dict = {s: stock_level_dict[s] for s in stock_filter if s in stock_level_dict}
@@ -424,13 +447,18 @@ def train_with_fixed_input_width(input_width: int = 7,
         model_dict = get_all_models_f()
     total_models = len(model_dict)
 
+    if train_configs is None:
+        train_configs = [None]
+    model_config_pairs: list[tuple[tuple[str, Callable[[], tf.keras.models.Sequential]], TrainConfig]] = list(
+        itertools.product(model_dict.items(), train_configs))
+
     model_count = 1
     max_parallel_tasks = 6
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_parallel_tasks) as executor:
         futures = []
         results = []
 
-        for model_name, model_f in model_dict.items():
+        for model, config in model_config_pairs:
             if len(futures) >= max_parallel_tasks:
                 done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
 
@@ -438,13 +466,40 @@ def train_with_fixed_input_width(input_width: int = 7,
                     results.append(future.result())
                     futures.remove(future)
 
+            model_name, model_f = model
+            if config is not None:
+                includes_signals = config.include_signal
+                if not config.include_signal:
+                    check_dir = _check_dir.joinpath('no_signal')
+                    result_dir = _result_dir.joinpath('no_signal')
+
+                if not config.include_stock_specific:
+                    stock_level_dict = {k: [f'Clsprc_{k}'] for k in stock_level_dict.keys()}
+                    check_dir = _check_dir.joinpath('no_stock_specific')
+                    result_dir = _result_dir.joinpath('no_stock_specific')
+
+                if config.macros is not None and len(config.macros) > 0:
+                    if config.category_name is not None:
+                        check_dir = _check_dir.joinpath(config.category_name)
+                        result_dir = _result_dir.joinpath(config.category_name)
+                    macros = config.macros
+                else:
+                    check_dir = _check_dir
+                    result_dir = _result_dir
+                    macros = macros_all
+
+                if config.omit_monthly:
+                    macros = [macro for macro in macros if macro in macros_daily]
+                    check_dir = _check_dir.joinpath('daily')
+                    result_dir = _result_dir.joinpath('daily')
+
             future = executor.submit(train_one_model,
                                      train.copy(), val.copy(), test.copy(),
                                      model_name, model_f,
                                      input_width, conv_width,
                                      stock_level_dict,
                                      check_dir, result_dir,
-                                     macros_all,
+                                     macros,
                                      model_count, total_models,
                                      is_testing=is_testing,
                                      includes_signals=includes_signals,
@@ -476,5 +531,50 @@ def train_with_multi_sizes(is_testing=False, ignore_existing: bool = False, size
     exit(1)
 
 
+def train_with_incomplete_data(is_testing=False):
+    train_configs: list[TrainConfig] = []
+
+    macro_df = pd.read_csv(r'/Users/a/PycharmProjects/capstone/capstone project/data/selection/macro_category.csv')
+    categories = macro_df['category'].unique()
+
+    for category in categories:
+        config = TrainConfig(
+            macros=macro_df[macro_df['category'] == category]['Acronym'].tolist(),
+            include_stock_specific=True,
+            include_signal=True,
+            omit_monthly=False,
+            category_name=category
+        )
+        train_configs.append(config)
+
+    train_configs.append(TrainConfig(
+        macros=macro_df['Acronym'].tolist(),
+        include_stock_specific=False,
+        include_signal=True,
+        omit_monthly=False
+    ))
+
+    train_configs.append(TrainConfig(
+        macros=macro_df['Acronym'].tolist(),
+        include_stock_specific=True,
+        include_signal=False,
+        omit_monthly=False
+    ))
+
+    train_configs.append(TrainConfig(
+        macros=macro_df['Acronym'].tolist(),
+        include_stock_specific=True,
+        include_signal=True,
+        omit_monthly=True
+    ))
+
+    train_with_fixed_input_width(input_width=14,
+                                 model_dict={'nnn5': nnn5},
+                                 train_configs=train_configs,
+                                 output_dir_name='incomplete',
+                                 is_testing=is_testing,
+                                 )
+
+
 if __name__ == '__main__':
-    train_with_multi_sizes(ignore_existing=True, sizes=[48])
+    train_with_incomplete_data(is_testing=True)
