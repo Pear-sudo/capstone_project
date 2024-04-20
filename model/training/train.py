@@ -458,7 +458,13 @@ def train_with_fixed_input_width(input_width: int = 7,
         futures = []
         results = []
 
+        _includes_signals = includes_signals
+        _stock_level_dict = stock_level_dict
         for model, config in model_config_pairs:
+            # let's first reset some variable changed by the previous run
+            includes_signals = _includes_signals
+            stock_level_dict = _stock_level_dict
+
             if len(futures) >= max_parallel_tasks:
                 done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
 
@@ -492,6 +498,16 @@ def train_with_fixed_input_width(input_width: int = 7,
                     macros = [macro for macro in macros if macro in macros_daily]
                     check_dir = _check_dir.joinpath('daily')
                     result_dir = _result_dir.joinpath('daily')
+            else:
+                macros = macros_all  # this get everything right, but this implementation is too ugly
+                check_dir = _check_dir
+                result_dir = _result_dir
+
+            try:
+                macros.remove('Date')
+            except ValueError:
+                # if this nasty column is not there, we are good
+                pass
 
             future = executor.submit(train_one_model,
                                      train.copy(), val.copy(), test.copy(),
@@ -568,6 +584,8 @@ def train_with_incomplete_data(is_testing=False):
         omit_monthly=True
     ))
 
+    train_configs.append(None)  # just to check this matches the original figure (with no data being dropped)
+
     train_with_fixed_input_width(input_width=14,
                                  model_dict={'nnn5': nnn5},
                                  train_configs=train_configs,
@@ -576,5 +594,12 @@ def train_with_incomplete_data(is_testing=False):
                                  )
 
 
+def reconcile():
+    train_with_fixed_input_width(input_width=14,
+                                 model_dict={'nnn5': nnn5},
+                                 output_dir_name='reconcile',
+                                 )
+
+
 if __name__ == '__main__':
-    train_with_incomplete_data(is_testing=True)
+    train_with_incomplete_data(is_testing=False)
