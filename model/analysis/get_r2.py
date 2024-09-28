@@ -1,6 +1,7 @@
+import pandas as pd
 from pathlib import Path
 
-import pandas as pd
+from model.loader import filter_files
 
 
 def get_r2(path: Path):
@@ -44,8 +45,28 @@ def get_r2(path: Path):
     df.to_excel(path.joinpath('r2.xlsx'))
 
 
+def get_dropped(path: Path):
+    r2_paths = filter_files(path, lambda s: Path(s).suffix == '.txt')
+    names = []
+    r2s = []
+    for r2_path in r2_paths:
+        name = r2_path.parent.name
+        if name == 'result':
+            name = 'complete'
+        with open(r2_path, 'r') as f:
+            s = f.readline().strip()
+            r2 = float(s)
+            r2s.append(r2)
+        names.append(name)
+    df = pd.DataFrame(zip(names, r2s), columns=['name', 'r2'])
+    save_path = path.joinpath('dropped_r2.xlsx')
+    df.to_excel(save_path, index=False)
+
+
 if __name__ == '__main__':
     real = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints_real/result')
     random = Path('/Users/a/PycharmProjects/capstone/capstone project/model/checkpoints/result')
-    get_r2(real)
+    dropped = Path('/Users/a/PycharmProjects/capstone/capstone project/model/incomplete/result')
+    dropped_random = Path('/Users/a/PycharmProjects/capstone/capstone project/model/incomplete_random/result')
+    get_dropped(dropped_random)
     # get_r2(random)

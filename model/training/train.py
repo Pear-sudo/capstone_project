@@ -1,19 +1,19 @@
+import itertools
+
 import concurrent.futures
 import inspect
-import itertools
+import numpy as np
 import os
+import pandas as pd
 import platform
 import random
+import tensorflow as tf
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Callable
-
-import numpy as np
-import pandas as pd
-import tensorflow as tf
 from keras import Sequential
+from pathlib import Path
 from sklearn.metrics import r2_score
+from typing import Callable
 
 import model.networks.cnn as cnn
 from model.loader import head
@@ -396,7 +396,8 @@ def train_with_fixed_input_width(input_width: int = 7,
                                  includes_signals: bool = True,
                                  ignore_existing: bool = False,
                                  train_configs: list[TrainConfig] = None,
-                                 output_dir_name: str = None
+                                 output_dir_name: str = None,
+                                 is_random: bool = False,
                                  ):
     input_width = input_width
     conv_width = 3  # this must match the setting in the conv neural network model
@@ -435,12 +436,14 @@ def train_with_fixed_input_width(input_width: int = 7,
         stock_all.extend(v)
 
     # load the dataset
-    train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
-    val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
-    test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
-    # train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
-    # val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
-    # test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
+    if not is_random:
+        train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train.csv')
+        val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val.csv')
+        test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test.csv')
+    else:
+        train = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/train_random.csv')
+        val = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/val_random.csv')
+        test = pd.read_csv('/Users/a/PycharmProjects/capstone/capstone project/out/test_random.csv')
 
     # get all the models we need to train
     if model_dict is None:
@@ -547,7 +550,7 @@ def train_with_multi_sizes(is_testing=False, ignore_existing: bool = False, size
     exit(1)
 
 
-def train_with_incomplete_data(is_testing=False):
+def train_with_incomplete_data(is_testing=False, is_random=False):
     train_configs: list[TrainConfig] = []
 
     macro_df = pd.read_csv(r'/Users/a/PycharmProjects/capstone/capstone project/data/selection/macro_category.csv')
@@ -589,8 +592,9 @@ def train_with_incomplete_data(is_testing=False):
     train_with_fixed_input_width(input_width=14,
                                  model_dict={'nnn5': nnn5},
                                  train_configs=train_configs,
-                                 output_dir_name='incomplete',
+                                 output_dir_name='incomplete_random',
                                  is_testing=is_testing,
+                                 is_random=is_random
                                  )
 
 
@@ -602,4 +606,4 @@ def reconcile():
 
 
 if __name__ == '__main__':
-    train_with_incomplete_data(is_testing=False)
+    train_with_incomplete_data(is_testing=False, is_random=True)

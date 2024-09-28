@@ -3,8 +3,11 @@
 *.zip
 *.yaml
 *.csv
+*.png
 
 model/checkpoints*/**
+model/incomplete*/**
+model/reconcile/**
 
 **/data/**/*.csv
 model/config/data/**
